@@ -418,11 +418,14 @@ function normalizeAudioKey(value) {
     .toLocaleLowerCase("bg-BG");
 }
 
-function getDocumentAudio(phrase) {
+function getLessonModuleNumber(lesson = ACTIVE_COURSE_DATA.lessons[state.lessonIndex]) {
+  const match = String(lesson?.title || "").match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
+function getDocumentAudio(phrase, moduleNumber = getLessonModuleNumber()) {
   const key = normalizeAudioKey(phrase?.bg);
-  const lessonTitle = ACTIVE_COURSE_DATA.lessons[state.lessonIndex]?.title || "";
-  const moduleMatch = lessonTitle.match(/\d+/);
-  const moduleAudio = moduleMatch ? DOCUMENT_AUDIO_BY_MODULE.get(`${Number(moduleMatch[0])}:${key}`) : "";
+  const moduleAudio = moduleNumber ? DOCUMENT_AUDIO_BY_MODULE.get(`${moduleNumber}:${key}`) : "";
   return moduleAudio || DOCUMENT_AUDIO_MAP.get(key);
 }
 
@@ -434,8 +437,8 @@ function renderAudioIconButton({ speak, audio = "", label = "Слушать ау
   `;
 }
 
-function renderInlineAudioButton(phrase, extraClass = "") {
-  const audio = getDocumentAudio(phrase);
+function renderInlineAudioButton(phrase, extraClass = "", moduleNumber = null) {
+  const audio = getDocumentAudio(phrase, moduleNumber);
   if (!audio) return "";
   return renderAudioIconButton({
     speak: phrase.bg,
@@ -713,12 +716,12 @@ function isLongDocumentPhrase(phrase) {
   return phrase.bg.length > 58 || /^(Въпрос|Вопрос|Отговор|Ответ|Кандидат|Служител):/i.test(phrase.bg);
 }
 
-function renderStructuredPhrase(phrase) {
+function renderStructuredPhrase(phrase, moduleNumber = null) {
   return `
     <div class="structured-phrase">
       <div class="structured-phrase-top">
         <div class="bg-text">${escapeHtml(phrase.bg)}</div>
-        ${renderInlineAudioButton(phrase, "structured-audio-button")}
+        ${renderInlineAudioButton(phrase, "structured-audio-button", moduleNumber)}
       </div>
       <div class="structured-label">Транскрипция:</div>
       <div class="accent-text">${escapeHtml(phrase.tr)}</div>
@@ -727,7 +730,7 @@ function renderStructuredPhrase(phrase) {
   `;
 }
 
-function renderDocumentTable(rows) {
+function renderDocumentTable(rows, moduleNumber = null) {
   const labels = ["Болгарский", "Транскрипция", "Перевод", "Аудио"];
   return `
     <div class="doc-table-wrap">
@@ -750,7 +753,7 @@ function renderDocumentTable(rows) {
                   </td>
                   <td class="accent-text" data-label="${labels[1]}">${escapeHtml(row.tr)}</td>
                   <td data-label="${labels[2]}">${escapeHtml(row.ru)}</td>
-                  <td class="doc-table-audio-cell" data-label="${labels[3]}">${renderInlineAudioButton(row, "table-audio-button")}</td>
+                  <td class="doc-table-audio-cell" data-label="${labels[3]}">${renderInlineAudioButton(row, "table-audio-button", moduleNumber)}</td>
                 </tr>
               `
             )
@@ -761,11 +764,11 @@ function renderDocumentTable(rows) {
   `;
 }
 
-function renderCompactDocumentPhrase(phrase) {
+function renderCompactDocumentPhrase(phrase, moduleNumber = null) {
   return `
     <p class="doc-line doc-phrase">
       <span class="doc-phrase-text">${escapeHtml(phrase.bg)} [болг] — «${escapeHtml(phrase.tr)}»</span>
-      ${renderInlineAudioButton(phrase)}
+      ${renderInlineAudioButton(phrase, "", moduleNumber)}
     </p>
   `;
 }
@@ -802,13 +805,13 @@ function renderDocumentLine(line) {
   return `<p class="doc-line ${className}">${escapeHtml(value)}</p>`;
 }
 
-function renderDocumentChunk(chunk) {
+function renderDocumentChunk(chunk, moduleNumber = null) {
   const output = [];
   for (let i = 0; i < chunk.length; i += 1) {
     const phrase = parseDocumentPhrase(chunk[i], chunk[i + 1]);
 
     if (phrase && isLongDocumentPhrase(phrase)) {
-      output.push(renderStructuredPhrase(phrase));
+      output.push(renderStructuredPhrase(phrase, moduleNumber));
       if (phrase.consumedNext) i += 1;
       continue;
     }
@@ -824,19 +827,19 @@ function renderDocumentChunk(chunk) {
       }
 
       if (rows.length >= 3) {
-        output.push(renderDocumentTable(rows));
+        output.push(renderDocumentTable(rows, moduleNumber));
         i = cursor - 1;
         continue;
       }
 
-      output.push(renderCompactDocumentPhrase(phrase));
+      output.push(renderCompactDocumentPhrase(phrase, moduleNumber));
       if (phrase.ru) output.push(renderDocumentLine(`Перевод: ${phrase.ru}`));
       if (phrase.consumedNext) i += 1;
       continue;
     }
 
     if (phrase && !isLongDocumentPhrase(phrase)) {
-      output.push(renderCompactDocumentPhrase(phrase));
+      output.push(renderCompactDocumentPhrase(phrase, moduleNumber));
       if (phrase.ru) output.push(renderDocumentLine(`Перевод: ${phrase.ru}`));
       if (phrase.consumedNext) i += 1;
       continue;
@@ -850,6 +853,7 @@ function renderDocumentChunk(chunk) {
 
 function renderDocumentBlocks(lesson) {
   if (!lesson.documentLines?.length) return "";
+  const moduleNumber = getLessonModuleNumber(lesson);
   const chunks = [];
   let current = [];
   lesson.documentLines.forEach((line) => {
@@ -869,7 +873,7 @@ function renderDocumentBlocks(lesson) {
           .map(
             (chunk) => `
               <div class="document-card">
-                ${renderDocumentChunk(chunk)}
+                ${renderDocumentChunk(chunk, moduleNumber)}
               </div>
             `
           )
