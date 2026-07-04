@@ -122,11 +122,21 @@ function cleanTranscription(value) {
 }
 
 const DOCUMENT_AUDIO_MAP = new Map([
-  ["добре", "audio/course/добрЕ.mp3"],
-  ["не", "audio/course/не.mp3"],
-  ["пет", "audio/course/пет.mp3"],
-  ["бъдеще", "audio/course/бЪдеще.mp3"]
+  ["добре", "audio/course/module-01/добре.mp3"],
+  ["не", "audio/course/module-01/не.mp3"],
+  ["пет", "audio/course/module-01/пет.mp3"],
+  ["бъдеще", "audio/course/module-01/бъдеще.mp3"]
 ]);
+const DOCUMENT_AUDIO_BY_MODULE = new Map();
+
+[
+  ["добре", "audio/course/module-01/добре.mp3"],
+  ["не", "audio/course/module-01/не.mp3"],
+  ["пет", "audio/course/module-01/пет.mp3"],
+  ["бъдеще", "audio/course/module-01/бъдеще.mp3"]
+].forEach(([key, audioPath]) => {
+  DOCUMENT_AUDIO_BY_MODULE.set(`1:${normalizeAudioKey(key)}`, audioPath);
+});
 
 [
   ["рота", "рота.mp3"],
@@ -165,7 +175,9 @@ const DOCUMENT_AUDIO_MAP = new Map([
   ["в българия", "в Болгарии.mp3"],
   ["във варна", "в Варне.mp3"]
 ].forEach(([key, file]) => {
-  DOCUMENT_AUDIO_MAP.set(key, `audio/course/module-02/${file}`);
+  const audioPath = `audio/course/module-02/${file}`;
+  DOCUMENT_AUDIO_MAP.set(key, audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`2:${normalizeAudioKey(key)}`, audioPath);
 });
 
 [
@@ -194,7 +206,9 @@ const DOCUMENT_AUDIO_MAP = new Map([
   ["приятно ми е", "приятно ми е.mp3"],
   ["също ми е приятно", "също ми е приятно.mp3"]
 ].forEach(([key, file]) => {
-  DOCUMENT_AUDIO_MAP.set(key, `audio/course/module-03/${file}`);
+  const audioPath = `audio/course/module-03/${file}`;
+  DOCUMENT_AUDIO_MAP.set(key, audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`3:${normalizeAudioKey(key)}`, audioPath);
 });
 
 [
@@ -225,7 +239,9 @@ const DOCUMENT_AUDIO_MAP = new Map([
   ["сърби", "сърби.mp3"],
   ["сръбкини", "сръбкини.mp3"]
 ].forEach(([key, file]) => {
-  DOCUMENT_AUDIO_MAP.set(key, `audio/course/module-04/${file}`);
+  const audioPath = `audio/course/module-04/${file}`;
+  DOCUMENT_AUDIO_MAP.set(key, audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`4:${normalizeAudioKey(key)}`, audioPath);
 });
 
 [
@@ -247,7 +263,9 @@ const DOCUMENT_AUDIO_MAP = new Map([
   ["той не е ли студент", "Мужской-Профессиональный213-2026-07-01-02-06-той-нээли-студэнт.mp3"],
   ["те не са ли сега в българия", "те не са ли сега в българия.mp3"]
 ].forEach(([key, file]) => {
-  DOCUMENT_AUDIO_MAP.set(key, `audio/course/module-05/${file}`);
+  const audioPath = `audio/course/module-05/${file}`;
+  DOCUMENT_AUDIO_MAP.set(key, audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`5:${normalizeAudioKey(key)}`, audioPath);
 });
 
 [
@@ -274,7 +292,9 @@ const DOCUMENT_AUDIO_MAP = new Map([
   ["варна е красив и спокоен морски град", "варна е красив и спокоен морски град.mp3"],
   ["е също много красив град", "градът е също много красив град.mp3"]
 ].forEach(([key, file]) => {
-  DOCUMENT_AUDIO_MAP.set(key, `audio/course/module-06/${file}`);
+  const audioPath = `audio/course/module-06/${file}`;
+  DOCUMENT_AUDIO_MAP.set(key, audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`6:${normalizeAudioKey(key)}`, audioPath);
 });
 
 [
@@ -346,7 +366,9 @@ const DOCUMENT_AUDIO_MAP = new Map([
   ["записан съм за десет часа", "записан съм за десет часа.mp3"],
   ["записана съм за десет часа", "записана съм за десет часа.mp3"]
 ].forEach(([key, file]) => {
-  DOCUMENT_AUDIO_MAP.set(key, `audio/course/module-07/${file}`);
+  const audioPath = `audio/course/module-07/${file}`;
+  DOCUMENT_AUDIO_MAP.set(key, audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`7:${normalizeAudioKey(key)}`, audioPath);
 });
 
 [
@@ -381,7 +403,9 @@ const DOCUMENT_AUDIO_MAP = new Map([
   ["планирам да придобия недвижим имот", "планирам да придобия недвижим имот.mp3"],
   ["мога да отговарям на български", "мога да отговарям на български.mp3"]
 ].forEach(([key, file]) => {
-  DOCUMENT_AUDIO_MAP.set(key, `audio/course/module-08/${file}`);
+  const audioPath = `audio/course/module-08/${file}`;
+  DOCUMENT_AUDIO_MAP.set(key, audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`8:${normalizeAudioKey(key)}`, audioPath);
 });
 
 function normalizeAudioKey(value) {
@@ -395,7 +419,11 @@ function normalizeAudioKey(value) {
 }
 
 function getDocumentAudio(phrase) {
-  return DOCUMENT_AUDIO_MAP.get(normalizeAudioKey(phrase?.bg));
+  const key = normalizeAudioKey(phrase?.bg);
+  const lessonTitle = ACTIVE_COURSE_DATA.lessons[state.lessonIndex]?.title || "";
+  const moduleMatch = lessonTitle.match(/\d+/);
+  const moduleAudio = moduleMatch ? DOCUMENT_AUDIO_BY_MODULE.get(`${Number(moduleMatch[0])}:${key}`) : "";
+  return moduleAudio || DOCUMENT_AUDIO_MAP.get(key);
 }
 
 function renderAudioIconButton({ speak, audio = "", label = "Слушать аудио", extraClass = "" }) {
@@ -408,9 +436,10 @@ function renderAudioIconButton({ speak, audio = "", label = "Слушать ау
 
 function renderInlineAudioButton(phrase, extraClass = "") {
   const audio = getDocumentAudio(phrase);
+  if (!audio) return "";
   return renderAudioIconButton({
     speak: phrase.bg,
-    audio: audio || "",
+    audio,
     label: "Слушать аудио",
     extraClass
   });
