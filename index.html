@@ -10,6 +10,34 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <section class="auth-screen" id="authScreen">
+      <div class="auth-card">
+        <div class="brand auth-brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div>
+            <p class="eyebrow">Доступ к курсу</p>
+            <h1>Българско гражданство</h1>
+          </div>
+        </div>
+        <h2>Войдите в курс</h2>
+        <p class="auth-lead">Используйте email и пароль, которые выдал администратор.</p>
+        <form class="auth-form" id="authForm">
+          <label>
+            Email
+            <input id="authEmail" type="email" autocomplete="email" placeholder="test@example.com" required />
+          </label>
+          <label>
+            Пароль
+            <input id="authPassword" type="password" autocomplete="current-password" placeholder="Введите пароль" required />
+          </label>
+          <button class="primary-button auth-submit" id="authSubmitButton" type="submit">Войти</button>
+          <p class="auth-message" id="authMessage" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
     <section class="course-chooser" id="courseChooser">
       <div class="chooser-inner">
         <p class="eyebrow">Добро пожаловать</p>
@@ -54,6 +82,7 @@
 
         <button class="ghost-button" id="resetProgressButton" type="button">Сбросить прогресс</button>
         <button class="ghost-button" id="backToChooserButton" type="button">На главный экран</button>
+        <button class="ghost-button sign-out-button" id="signOutButton" type="button">Выйти из аккаунта</button>
       </aside>
 
       <main class="main">
@@ -184,6 +213,7 @@
     <script src="universal-course.js"></script>
     <script src="interview-structure.js"></script>
     <script src="full-course-2026.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
   </body>
 </html>

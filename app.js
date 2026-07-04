@@ -9,8 +9,26 @@ const state = {
 
 let ACTIVE_COURSE_DATA = COURSE_DATA;
 let activePlayback = null;
+let currentUser = null;
+
+const SUPABASE_URL = "https://powheluxxtvibrtukzux.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvd2hlbHV4eHR2aWJydHVrenV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxNjQ5NDQsImV4cCI6MjA5ODc0MDk0NH0.z4Zruq6dSraDKVppTpQvgeM1C0aTKyYy_owZ0JCRf90";
+const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    persistSession: true
+  }
+});
 
 const els = {
+  authScreen: document.getElementById("authScreen"),
+  authForm: document.getElementById("authForm"),
+  authEmail: document.getElementById("authEmail"),
+  authPassword: document.getElementById("authPassword"),
+  authSubmitButton: document.getElementById("authSubmitButton"),
+  authMessage: document.getElementById("authMessage"),
   lessonList: document.getElementById("lessonList"),
   appShell: document.getElementById("appShell"),
   courseChooser: document.getElementById("courseChooser"),
@@ -30,6 +48,7 @@ const els = {
   playIntroButton: document.getElementById("playIntroButton"),
   skipIntroButton: document.getElementById("skipIntroButton"),
   resetProgressButton: document.getElementById("resetProgressButton"),
+  signOutButton: document.getElementById("signOutButton"),
   profileForm: document.getElementById("profileForm"),
   personalAnswer: document.getElementById("personalAnswer"),
   speakPersonalButton: document.getElementById("speakPersonalButton"),
@@ -452,7 +471,114 @@ function getQuestion(id) {
   return ACTIVE_COURSE_DATA.questions.find((question) => question.id === id);
 }
 
+function setAuthMessage(message = "", type = "error") {
+  if (!els.authMessage) return;
+  els.authMessage.textContent = message;
+  els.authMessage.dataset.type = type;
+}
+
+function setAuthLoading(isLoading) {
+  if (els.authSubmitButton) {
+    els.authSubmitButton.disabled = isLoading;
+    els.authSubmitButton.textContent = isLoading ? "Проверяем..." : "Войти";
+  }
+  if (els.authEmail) els.authEmail.disabled = isLoading;
+  if (els.authPassword) els.authPassword.disabled = isLoading;
+}
+
+function showAuthScreen(message = "", type = "error") {
+  els.authScreen?.classList.remove("is-hidden");
+  els.courseChooser?.classList.add("is-hidden");
+  els.appShell?.classList.add("is-hidden");
+  document.body.classList.add("auth-mode");
+  setAuthMessage(message, type);
+}
+
+function showAuthorizedCourse(session) {
+  currentUser = session?.user || currentUser;
+  els.authScreen?.classList.add("is-hidden");
+  document.body.classList.remove("auth-mode");
+  setAuthMessage("");
+  setCourseMode("interview");
+}
+
+function getAuthErrorMessage(error) {
+  const message = String(error?.message || "").toLowerCase();
+  if (message.includes("invalid login credentials")) return "Неверный email или пароль.";
+  if (message.includes("email not confirmed")) return "Email не подтвержден. Проверьте пользователя в Supabase.";
+  return "Не удалось войти. Проверьте email и пароль.";
+}
+
+async function initAuth() {
+  if (!supabaseClient) {
+    showAuthScreen("Не удалось загрузить Supabase Auth. Проверьте подключение к интернету.");
+    return;
+  }
+
+  setAuthLoading(true);
+  const { data, error } = await supabaseClient.auth.getSession();
+  setAuthLoading(false);
+
+  if (error) {
+    showAuthScreen("Не удалось проверить сессию. Попробуйте обновить страницу.");
+    return;
+  }
+
+  if (data?.session) {
+    showAuthorizedCourse(data.session);
+  } else {
+    showAuthScreen();
+  }
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session?.user) {
+      showAuthorizedCourse(session);
+      return;
+    }
+    currentUser = null;
+    showAuthScreen(event === "SIGNED_OUT" ? "Вы вышли из аккаунта." : "", event === "SIGNED_OUT" ? "info" : "error");
+  });
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  if (!supabaseClient) {
+    setAuthMessage("Supabase Auth не загрузился. Обновите страницу.");
+    return;
+  }
+
+  const email = els.authEmail?.value.trim();
+  const password = els.authPassword?.value;
+  if (!email || !password) {
+    setAuthMessage("Введите email и пароль.");
+    return;
+  }
+
+  setAuthMessage("");
+  setAuthLoading(true);
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  setAuthLoading(false);
+
+  if (error) {
+    setAuthMessage(getAuthErrorMessage(error));
+    return;
+  }
+
+  if (data?.session) showAuthorizedCourse(data.session);
+}
+
+async function handleSignOut() {
+  clearActivePlayback();
+  currentUser = null;
+  if (supabaseClient) await supabaseClient.auth.signOut();
+  showAuthScreen("Вы вышли из аккаунта.", "info");
+}
+
 function setCourseMode(_mode = "interview", options = {}) {
+  if (!currentUser) {
+    showAuthScreen();
+    return;
+  }
   const mode = "interview";
   state.courseMode = mode;
   ACTIVE_COURSE_DATA = COURSE_DATA;
@@ -470,6 +596,10 @@ function setCourseMode(_mode = "interview", options = {}) {
 }
 
 function showCourseChooser() {
+  if (!currentUser) {
+    showAuthScreen();
+    return;
+  }
   els.courseChooser?.classList.remove("is-hidden");
   els.appShell?.classList.add("is-hidden");
   localStorage.removeItem("bgCourseMode");
@@ -1550,6 +1680,8 @@ els.prevLessonButton.addEventListener("click", () => setLesson(state.lessonIndex
 els.nextLessonButton.addEventListener("click", () => setLesson(state.lessonIndex + 1));
 els.chooseInterviewButton?.addEventListener("click", () => setCourseMode("interview"));
 els.backToChooserButton?.addEventListener("click", showCourseChooser);
+els.authForm?.addEventListener("submit", handleAuthSubmit);
+els.signOutButton?.addEventListener("click", handleSignOut);
 
 els.startCourseButton.addEventListener("click", () => setLesson(1));
 els.skipIntroButton.addEventListener("click", () => setLesson(1));
@@ -1601,4 +1733,4 @@ els.copyPersonalButton.addEventListener("click", async () => {
 });
 
 loadProfileForm();
-setCourseMode("interview");
+initAuth();
