@@ -226,16 +226,424 @@ function applyTextReplacements(value, replacements) {
   return replacements.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), String(value || ""));
 }
 
+const BG_UNITS = ["нула", "едно", "две", "три", "четири", "пет", "шест", "седем", "осем", "девет"];
+const BG_TEENS = {
+  10: "десет",
+  11: "единадесет",
+  12: "дванадесет",
+  13: "тринадесет",
+  14: "четиринадесет",
+  15: "петнадесет",
+  16: "шестнадесет",
+  17: "седемнадесет",
+  18: "осемнадесет",
+  19: "деветнадесет"
+};
+const BG_TENS = {
+  20: "двадесет",
+  30: "тридесет",
+  40: "четиридесет",
+  50: "петдесет",
+  60: "шестдесет",
+  70: "седемдесет",
+  80: "осемдесет",
+  90: "деветдесет"
+};
+const BG_HUNDREDS = {
+  100: "сто",
+  200: "двеста",
+  300: "триста",
+  400: "четиристотин",
+  500: "петстотин",
+  600: "шестстотин",
+  700: "седемстотин",
+  800: "осемстотин",
+  900: "деветстотин"
+};
+const BG_ORDINALS = {
+  1: "първи",
+  2: "втори",
+  3: "трети",
+  4: "четвърти",
+  5: "пети",
+  6: "шести",
+  7: "седми",
+  8: "осми",
+  9: "девети",
+  10: "десети",
+  11: "единадесети",
+  12: "дванадесети",
+  13: "тринадесети",
+  14: "четиринадесети",
+  15: "петнадесети",
+  16: "шестнадесети",
+  17: "седемнадесети",
+  18: "осемнадесети",
+  19: "деветнадесети",
+  20: "двадесети",
+  21: "двадесет и първи",
+  22: "двадесет и втори",
+  23: "двадесет и трети",
+  24: "двадесет и четвърти",
+  25: "двадесет и пети",
+  26: "двадесет и шести",
+  27: "двадесет и седми",
+  28: "двадесет и осми",
+  29: "двадесет и девети",
+  30: "тридесети",
+  31: "тридесет и първи"
+};
+
+const RU_UNITS = ["ноль", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"];
+const RU_TEENS = {
+  10: "десять",
+  11: "одиннадцать",
+  12: "двенадцать",
+  13: "тринадцать",
+  14: "четырнадцать",
+  15: "пятнадцать",
+  16: "шестнадцать",
+  17: "семнадцать",
+  18: "восемнадцать",
+  19: "девятнадцать"
+};
+const RU_TENS = {
+  20: "двадцать",
+  30: "тридцать",
+  40: "сорок",
+  50: "пятьдесят",
+  60: "шестьдесят",
+  70: "семьдесят",
+  80: "восемьдесят",
+  90: "девяносто"
+};
+const RU_HUNDREDS = {
+  100: "сто",
+  200: "двести",
+  300: "триста",
+  400: "четыреста",
+  500: "пятьсот",
+  600: "шестьсот",
+  700: "семьсот",
+  800: "восемьсот",
+  900: "девятьсот"
+};
+const RU_ORDINALS = {
+  masculine: {
+    1: "первый",
+    2: "второй",
+    3: "третий",
+    4: "четвертый",
+    5: "пятый",
+    6: "шестой",
+    7: "седьмой",
+    8: "восьмой",
+    9: "девятый",
+    10: "десятый",
+    11: "одиннадцатый",
+    12: "двенадцатый",
+    13: "тринадцатый",
+    14: "четырнадцатый",
+    15: "пятнадцатый",
+    16: "шестнадцатый",
+    17: "семнадцатый",
+    18: "восемнадцатый",
+    19: "девятнадцатый",
+    20: "двадцатый",
+    21: "двадцать первый",
+    22: "двадцать второй",
+    23: "двадцать третий",
+    24: "двадцать четвертый",
+    25: "двадцать пятый",
+    26: "двадцать шестой",
+    27: "двадцать седьмой",
+    28: "двадцать восьмой",
+    29: "двадцать девятый",
+    30: "тридцатый",
+    31: "тридцать первый"
+  },
+  feminine: {
+    1: "первая",
+    2: "вторая",
+    3: "третья",
+    4: "четвертая",
+    5: "пятая",
+    6: "шестая",
+    7: "седьмая",
+    8: "восьмая",
+    9: "девятая",
+    10: "десятая",
+    11: "одиннадцатая",
+    12: "двенадцатая",
+    13: "тринадцатая",
+    14: "четырнадцатая",
+    15: "пятнадцатая",
+    16: "шестнадцатая",
+    17: "семнадцатая",
+    18: "восемнадцатая",
+    19: "девятнадцатая",
+    20: "двадцатая",
+    21: "двадцать первая",
+    22: "двадцать вторая",
+    23: "двадцать третья",
+    24: "двадцать четвертая",
+    25: "двадцать пятая",
+    26: "двадцать шестая",
+    27: "двадцать седьмая",
+    28: "двадцать восьмая",
+    29: "двадцать девятая",
+    30: "тридцатая",
+    31: "тридцать первая"
+  },
+  genitive: {
+    1: "первого",
+    2: "второго",
+    3: "третьего",
+    4: "четвертого",
+    5: "пятого",
+    6: "шестого",
+    7: "седьмого",
+    8: "восьмого",
+    9: "девятого",
+    10: "десятого",
+    11: "одиннадцатого",
+    12: "двенадцатого",
+    13: "тринадцатого",
+    14: "четырнадцатого",
+    15: "пятнадцатого",
+    16: "шестнадцатого",
+    17: "семнадцатого",
+    18: "восемнадцатого",
+    19: "девятнадцатого",
+    20: "двадцатого",
+    21: "двадцать первого",
+    22: "двадцать второго",
+    23: "двадцать третьего",
+    24: "двадцать четвертого",
+    25: "двадцать пятого",
+    26: "двадцать шестого",
+    27: "двадцать седьмого",
+    28: "двадцать восьмого",
+    29: "двадцать девятого",
+    30: "тридцатого",
+    31: "тридцать первого"
+  }
+};
+
+const TR_UNITS = ["нУла", "еднО", "две", "три", "чЕтири", "пет", "шест", "сЕдем", "Осем", "дЕвет"];
+const TR_TEENS = {
+  10: "дЕсет",
+  11: "единАдесет",
+  12: "дванАдесет",
+  13: "тринАдесет",
+  14: "четиринАдесет",
+  15: "петнАдесет",
+  16: "шестнАдесет",
+  17: "седемнАдесет",
+  18: "осемнАдесет",
+  19: "деветнАдесет"
+};
+const TR_TENS = {
+  20: "двАдесет",
+  30: "трИдесет",
+  40: "четиридЕсет",
+  50: "петдЕсет",
+  60: "шестдЕсет",
+  70: "седемдЕсет",
+  80: "осемдЕсет",
+  90: "деветдЕсет"
+};
+const TR_HUNDREDS = {
+  100: "сто",
+  200: "двЕста",
+  300: "трИста",
+  400: "четиристОтин",
+  500: "петстОтин",
+  600: "шестстОтин",
+  700: "седемстОтин",
+  800: "осемстОтин",
+  900: "деветстОтин"
+};
+const BG_MONTHS_BY_NUMBER = {
+  1: "януари",
+  2: "февруари",
+  3: "март",
+  4: "април",
+  5: "май",
+  6: "юни",
+  7: "юли",
+  8: "август",
+  9: "септември",
+  10: "октомври",
+  11: "ноември",
+  12: "декември"
+};
+const RU_MONTHS_BY_NUMBER = {
+  1: "января",
+  2: "февраля",
+  3: "марта",
+  4: "апреля",
+  5: "мая",
+  6: "июня",
+  7: "июля",
+  8: "августа",
+  9: "сентября",
+  10: "октября",
+  11: "ноября",
+  12: "декабря"
+};
+const TR_MONTHS_BY_NUMBER = {
+  1: "януАри",
+  2: "февруАри",
+  3: "март",
+  4: "апрИл",
+  5: "май",
+  6: "Юни",
+  7: "Юли",
+  8: "Август",
+  9: "септЕмври",
+  10: "октОмври",
+  11: "ноЕмври",
+  12: "декЕмври"
+};
+
+function convertUnder100(number, units, teens, tens) {
+  if (number < 10) return units[number];
+  if (number < 20) return teens[number];
+  const ten = Math.floor(number / 10) * 10;
+  const unit = number % 10;
+  return unit ? `${tens[ten]} и ${units[unit]}` : tens[ten];
+}
+
+function convertUnder1000(number, units, teens, tens, hundreds) {
+  if (number < 100) return convertUnder100(number, units, teens, tens);
+  const hundred = Math.floor(number / 100) * 100;
+  const rest = number % 100;
+  if (!rest) return hundreds[hundred];
+  const connector = rest < 20 || rest % 10 === 0 ? " и " : " ";
+  return `${hundreds[hundred]}${connector}${convertUnder100(rest, units, teens, tens)}`;
+}
+
+function bgNumberToWords(number) {
+  const n = Number(number);
+  if (!Number.isFinite(n)) return String(number);
+  if (n < 1000) return convertUnder1000(n, BG_UNITS, BG_TEENS, BG_TENS, BG_HUNDREDS);
+  if (n < 1000000) {
+    const thousands = Math.floor(n / 1000);
+    const rest = n % 1000;
+    const prefix = thousands === 1 ? "хиляда" : `${bgNumberToWords(thousands)} хиляди`;
+    if (!rest) return prefix;
+    return `${prefix}${rest < 100 ? " и " : " "}${bgNumberToWords(rest)}`;
+  }
+  return String(number);
+}
+
+function ruNumberToWords(number) {
+  const n = Number(number);
+  if (!Number.isFinite(n)) return String(number);
+  if (n < 1000) return convertUnder1000(n, RU_UNITS, RU_TEENS, RU_TENS, RU_HUNDREDS);
+  if (n < 1000000) {
+    const thousands = Math.floor(n / 1000);
+    const rest = n % 1000;
+    const prefix = thousands === 1 ? "тысяча" : `${ruNumberToWords(thousands)} тысячи`;
+    if (!rest) return prefix;
+    return `${prefix} ${ruNumberToWords(rest)}`;
+  }
+  return String(number);
+}
+
+function trNumberToWords(number) {
+  const n = Number(number);
+  if (!Number.isFinite(n)) return String(number);
+  if (n < 1000) return convertUnder1000(n, TR_UNITS, TR_TEENS, TR_TENS, TR_HUNDREDS);
+  if (n < 1000000) {
+    const thousands = Math.floor(n / 1000);
+    const rest = n % 1000;
+    const prefix = thousands === 1 ? "хилЯда" : `${trNumberToWords(thousands)} хилЯди`;
+    if (!rest) return prefix;
+    return `${prefix}${rest < 100 ? " и " : " "}${trNumberToWords(rest)}`;
+  }
+  return String(number);
+}
+
+function shouldSkipNumberReplacement(text, offset, length) {
+  const prev = text[offset - 1] || "";
+  const next = text[offset + length] || "";
+  return /[A-Za-zА-Яа-я_@/]/.test(prev) || /[A-Za-zА-Яа-я_@/]/.test(next);
+}
+
+function replacePlainNumbers(text, converter) {
+  return String(text || "").replace(/\d{1,6}/g, (match, offset, source) => {
+    if (shouldSkipNumberReplacement(source, offset, match.length)) return match;
+    return converter(Number(match));
+  });
+}
+
+function expandNumbersInBulgarian(value) {
+  return String(value || "")
+    .replace(/\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b/g, (_, day, month, year) => {
+      const dayWord = BG_ORDINALS[Number(day)] || bgNumberToWords(day);
+      const monthWord = BG_MONTHS_BY_NUMBER[Number(month)] || bgNumberToWords(month);
+      return `${dayWord} ${monthWord} ${bgNumberToWords(year)} година`;
+    })
+    .replace(/\b(\d{1,2})-(?:ви|ри|ти)\b/g, (_, number) => BG_ORDINALS[Number(number)] || bgNumberToWords(number))
+    .replace(/\b(\d{1,2})-(?:й|я|го)\b/g, (_, number) => BG_ORDINALS[Number(number)] || bgNumberToWords(number))
+    .replace(/\b(\d{1,2})\s*-\s*(?:и|ти)\b/g, (_, number) => BG_ORDINALS[Number(number)] || bgNumberToWords(number))
+    .replace(/\b(\d{1,2})\.(?=\s+[А-Яа-я])/g, (_, number) => `${bgNumberToWords(number)}.`)
+    .replace(/\b(\d{1,2})\.(?=\s*$)/g, (_, number) => `${bgNumberToWords(number)}.`)
+    .replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (_, first, second) => `${bgNumberToWords(first)} / ${bgNumberToWords(second)}`)
+    .replace(/\b(\d{1,6})\b/g, (match, offset, source) => {
+      if (shouldSkipNumberReplacement(source, offset, match.length)) return match;
+      return bgNumberToWords(Number(match));
+    });
+}
+
+function expandNumbersInRussian(value) {
+  return String(value || "")
+    .replace(/\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b/g, (_, day, month, year) => {
+      const dayWord = RU_ORDINALS.genitive[Number(day)] || ruNumberToWords(day);
+      const monthWord = RU_MONTHS_BY_NUMBER[Number(month)] || ruNumberToWords(month);
+      return `${dayWord} ${monthWord} ${ruNumberToWords(year)} года`;
+    })
+    .replace(/\b(\d{1,2})-й\b/g, (_, number) => RU_ORDINALS.masculine[Number(number)] || ruNumberToWords(number))
+    .replace(/\b(\d{1,2})-я\b/g, (_, number) => RU_ORDINALS.feminine[Number(number)] || ruNumberToWords(number))
+    .replace(/\b(\d{1,2})-го\b/g, (_, number) => RU_ORDINALS.genitive[Number(number)] || ruNumberToWords(number))
+    .replace(/\b(\d{1,2})\.(?=\s+[А-Яа-я])/g, (_, number) => `${ruNumberToWords(number)}.`)
+    .replace(/\b(\d{1,2})\.(?=\s*$)/g, (_, number) => `${ruNumberToWords(number)}.`)
+    .replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (_, first, second) => `${ruNumberToWords(first)} / ${ruNumberToWords(second)}`)
+    .replace(/\b(\d{1,6})\b/g, (match, offset, source) => {
+      if (shouldSkipNumberReplacement(source, offset, match.length)) return match;
+      return ruNumberToWords(Number(match));
+    });
+}
+
+function expandNumbersInTranscript(value) {
+  return String(value || "")
+    .replace(/\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b/g, (_, day, month, year) => {
+      const dayWord = trNumberToWords(day);
+      const monthWord = TR_MONTHS_BY_NUMBER[Number(month)] || trNumberToWords(month);
+      return `${dayWord} ${monthWord} ${trNumberToWords(year)} годИна`;
+    })
+    .replace(/\b(\d{1,2})-(?:й|я|го|ви|ри|ти)\b/g, (_, number) => trNumberToWords(number))
+    .replace(/\b(\d{1,2})\.(?=\s+[А-Яа-яA-Za-z])/g, (_, number) => `${trNumberToWords(number)}.`)
+    .replace(/\b(\d{1,2})\.(?=\s*$)/g, (_, number) => `${trNumberToWords(number)}.`)
+    .replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (_, first, second) => `${trNumberToWords(first)} / ${trNumberToWords(second)}`)
+    .replace(/\b(\d{1,6})\b/g, (match, offset, source) => {
+      if (shouldSkipNumberReplacement(source, offset, match.length)) return match;
+      return trNumberToWords(Number(match));
+    });
+}
+
 function formatBulgarianText(value) {
-  return stripStressMarks(normalizeBulgarianStressCaps(applyTextReplacements(replaceTemplateHints(value), BG_TEXT_REPLACEMENTS)));
+  return expandNumbersInBulgarian(stripStressMarks(normalizeBulgarianStressCaps(applyTextReplacements(replaceTemplateHints(value), BG_TEXT_REPLACEMENTS))));
 }
 
 function formatTranslationText(value) {
-  return applyTextReplacements(replaceTemplateHints(value), RU_TEXT_REPLACEMENTS);
+  return expandNumbersInRussian(applyTextReplacements(replaceTemplateHints(value), RU_TEXT_REPLACEMENTS));
 }
 
 function formatTranscriptText(value) {
-  return stripStressMarks(replaceTemplateHints(value));
+  return expandNumbersInTranscript(stripStressMarks(replaceTemplateHints(value)));
 }
 
 function formatCourseLine(value) {
@@ -1187,7 +1595,8 @@ function renderCompactDocumentPhrase(phrase, moduleNumber = null) {
 }
 
 function renderDocumentLine(line) {
-  const value = formatCourseLine(String(line || "").trim());
+  const rawValue = String(line || "").trim();
+  const value = /^Перевод:/i.test(rawValue) ? formatTranslationText(rawValue) : formatCourseLine(rawValue);
   const className = [
     /^(\d+(\.\d+)?\.|[A-ZА]\.\d+\.)/.test(value) ? "doc-subtitle" : "",
     /^(Перевод|Произношение|Пояснение|Правило|Важно|Источник|Цель|Контент|Формат|Кандидат|Служител|Вопрос|Ответ)/i.test(value) ? "doc-note" : "",
