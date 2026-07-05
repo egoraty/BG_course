@@ -438,7 +438,7 @@ button {
 }
 
 .topbar {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -1279,11 +1279,7 @@ button {
     height: 100vh;
     min-height: 0;
     overflow: hidden;
-    padding: 24px 96px 24px 24px;
-  }
-
-  .topbar {
-    flex: 0 0 auto;
+    padding: 12px 96px 24px 24px;
   }
 
   .workspace {

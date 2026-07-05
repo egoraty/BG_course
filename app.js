@@ -107,15 +107,150 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function stripStressMarks(value) {
+  return String(value || "").normalize("NFD").replace(/\u0301/g, "").normalize("NFC");
+}
+
+const TEMPLATE_HINTS = {
+  "име": "Петър / Анна",
+  "имя": "Петър / Анна",
+  "бащино име": "Алексеевич / Сергеевна",
+  "отчество": "Алексеевич / Сергеевна",
+  "фамилия": "Иванов / Смирнова",
+  "дата": "дванадесети март хиляда деветстотин осемдесет и четвърта година / пети септември две хиляди и втора година",
+  "държава": "Русия / Беларус",
+  "страна": "Русия / Беларус",
+  "град": "Москва / Минск",
+  "място": "Москва / Минск",
+  "адрес": "град Москва, улица Тверская, номер петнадесет, апартамент двадесет и четири / град Минск, проспект Независимости, номер четиридесет и пет, апартамент осемнадесет",
+  "улица": "Тверская / проспект Независимости",
+  "номер": "петнадесет / четиридесет и пет",
+  "телефон": "плюс седем деветстотин шестнадесет двеста тридесет и четири петдесет и шест седемдесет и осем",
+  "имейл": "ivanov@example.com / smirnova@example.com",
+  "професия": "инженер / студентка",
+  "хоби": "спорт и пътувания / книги и музика",
+  "роднина": "прабаба Мария Петрова / прадядо Георги Иванов",
+  "линия": "по майчина линия / по бащина линия"
+};
+
+function normalizeTemplateKey(value) {
+  return stripStressMarks(String(value || ""))
+    .toLocaleLowerCase("bg-BG")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function replaceTemplateHints(value) {
+  return String(value || "").replace(/\[([^\]]+)\]/g, (match, key) => {
+    const hint = TEMPLATE_HINTS[normalizeTemplateKey(key)];
+    return hint ? `[${hint}]` : match;
+  });
+}
+
+function normalizeBulgarianStressCaps(value) {
+  return String(value || "").replace(/[\p{Script=Cyrillic}]+/gu, (word) => {
+    const letters = [...word];
+    const hasLower = letters.some((char) => char === char.toLocaleLowerCase("bg-BG") && char !== char.toLocaleUpperCase("bg-BG"));
+    const hasUpper = letters.some((char, index) => index > 0 && char === char.toLocaleUpperCase("bg-BG") && char !== char.toLocaleLowerCase("bg-BG"));
+    if (!hasLower || !hasUpper) return word;
+    return letters
+      .map((char, index) => {
+        const isLetter = char.toLocaleLowerCase("bg-BG") !== char.toLocaleUpperCase("bg-BG");
+        if (!isLetter) return char;
+        if (index === 0 && char === char.toLocaleUpperCase("bg-BG")) return char;
+        return char.toLocaleLowerCase("bg-BG");
+      })
+      .join("");
+  });
+}
+
+const BG_TEXT_REPLACEMENTS = [
+  [/\b12 юли 1991 година\b/g, "дванадесети юли хиляда деветстотин деветдесет и първа година"],
+  [/\b12 юли 1991 г\./g, "дванадесети юли хиляда деветстотин деветдесет и първа година"],
+  [/\b3 март 1878 година\b/g, "трети март хиляда осемстотин седемдесет и осма година"],
+  [/\b3 март\b/g, "трети март"],
+  [/\b24 май\b/g, "двадесет и четвърти май"],
+  [/\b6 май\b/g, "шести май"],
+  [/\b2 юни\b/g, "втори юни"],
+  [/\b6 септември\b/g, "шести септември"],
+  [/\b22 септември 1908 година\b/g, "двадесет и втори септември хиляда деветстотин и осма година"],
+  [/\b1 ноември\b/g, "първи ноември"],
+  [/\b1 януари 2007 година\b/g, "първи януари две хиляди и седма година"],
+  [/\b29 март 2004 година\b/g, "двадесет и девети март две хиляди и четвърта година"],
+  [/\b1 януари 2026 година\b/g, "първи януари две хиляди двадесет и шеста година"],
+  [/\b1885 година\b/g, "хиляда осемстотин осемдесет и пета година"],
+  [/\b1878 година\b/g, "хиляда осемстотин седемдесет и осма година"],
+  [/\b1984 година\b/g, "хиляда деветстотин осемдесет и четвърта година"],
+  [/\b2002 година\b/g, "две хиляди и втора година"],
+  [/\b1991 година\b/g, "хиляда деветстотин деветдесет и първа година"],
+  [/\b1908 година\b/g, "хиляда деветстотин и осма година"],
+  [/\b2004 година\b/g, "две хиляди и четвърта година"],
+  [/\b2007 година\b/g, "две хиляди и седма година"],
+  [/\b2026 година\b/g, "две хиляди двадесет и шеста година"],
+  [/\b57 въпроса\b/g, "петдесет и седем въпроса"]
+];
+
+const RU_TEXT_REPLACEMENTS = [
+  [
+    /В болгарском слове ударная гласная может быть выделена прописной буквой: добрЕ, кАзвам, бЪлгарски\. В русской транскрипции используется знак ударения: ДОБРЭ́, КА́ЗВАМ, БЫ́ЛГАРСКИ\./g,
+    "В болгарской строке слова пишутся обычным начертанием: добре, казвам, български. В русской транскрипции ударную букву показываем прописной: ДОБРЭ, КАЗВАМ, БЫЛГАРСКИ."
+  ],
+  [/Ударная гласная в транскрипции отмечена знаком ударения\./g, "Ударная буква в русской транскрипции выделяется прописной."],
+  [/\b12 июля 1991 года\b/g, "двенадцатого июля тысяча девятьсот девяносто первого года"],
+  [/\b3 марта 1878 года\b/g, "третьего марта тысяча восемьсот семьдесят восьмого года"],
+  [/\b3 марта\b/g, "третьего марта"],
+  [/\b24 мая\b/g, "двадцать четвертого мая"],
+  [/\b6 мая\b/g, "шестого мая"],
+  [/\b2 июня\b/g, "второго июня"],
+  [/\b6 сентября\b/g, "шестого сентября"],
+  [/\b22 сентября 1908 года\b/g, "двадцать второго сентября тысяча девятьсот восьмого года"],
+  [/\b1 ноября\b/g, "первого ноября"],
+  [/\b1 января 2007 года\b/g, "первого января две тысячи седьмого года"],
+  [/\b29 марта 2004 года\b/g, "двадцать девятого марта две тысячи четвертого года"],
+  [/\b1 января 2026 года\b/g, "первого января две тысячи двадцать шестого года"],
+  [/\b1885 года\b/g, "тысяча восемьсот восемьдесят пятого года"],
+  [/\b1878 года\b/g, "тысяча восемьсот семьдесят восьмого года"],
+  [/\b12 марта 1984 года\b/g, "двенадцатого марта тысяча девятьсот восемьдесят четвертого года"],
+  [/\b5 сентября 2002 года\b/g, "пятого сентября две тысячи второго года"],
+  [/\b1984 года\b/g, "тысяча девятьсот восемьдесят четвертого года"],
+  [/\b2002 года\b/g, "две тысячи второго года"],
+  [/\b1991 года\b/g, "тысяча девятьсот девяносто первого года"],
+  [/\b1908 года\b/g, "тысяча девятьсот восьмого года"],
+  [/\b2004 года\b/g, "две тысячи четвертого года"],
+  [/\b2007 года\b/g, "две тысячи седьмого года"],
+  [/\b2026 года\b/g, "две тысячи двадцать шестого года"],
+  [/\b57 вопросов\b/g, "пятидесяти семи вопросов"]
+];
+
+function applyTextReplacements(value, replacements) {
+  return replacements.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), String(value || ""));
+}
+
+function formatBulgarianText(value) {
+  return stripStressMarks(normalizeBulgarianStressCaps(applyTextReplacements(replaceTemplateHints(value), BG_TEXT_REPLACEMENTS)));
+}
+
+function formatTranslationText(value) {
+  return applyTextReplacements(replaceTemplateHints(value), RU_TEXT_REPLACEMENTS);
+}
+
+function formatTranscriptText(value) {
+  return stripStressMarks(replaceTemplateHints(value));
+}
+
+function formatCourseLine(value) {
+  return formatBulgarianText(applyTextReplacements(value, RU_TEXT_REPLACEMENTS));
+}
+
 function normalizeTranscriptDisplay(value) {
-  return String(value || "")
+  return stripStressMarks(String(value || "")
     .replace(/тя нэ э ли/g, "тянээли")
     .replace(/ТЯ НЭ Э ЛИ/g, "ТЯНЭЭЛИ")
     .replace(/ия/g, "ья")
     .replace(/Ия/g, "Ья")
     .replace(/ИЯ/g, "ЬЯ")
     .replace(/б([ыЫ]\u0301?)лгарка/g, "б$1лгрка")
-    .replace(/Б([Ыы]\u0301?)ЛГАРКА/g, "Б$1ЛГРКА");
+    .replace(/Б([Ыы]\u0301?)ЛГАРКА/g, "Б$1ЛГРКА"));
 }
 
 function cleanTranscription(value) {
@@ -605,20 +740,168 @@ function showCourseChooser() {
   localStorage.removeItem("bgCourseMode");
 }
 
+const SAMPLE_PROFILES = {
+  male: {
+    firstName: "Петър",
+    patronymic: "Алексеевич",
+    surname: "Иванов",
+    birthDate: "1984-03-12",
+    birthCity: "Москва",
+    birthCountry: "Русия",
+    residence: "Русия, град Москва",
+    citizenship: "руско",
+    ancestor: "Мария Петрова",
+    preferredCity: "София",
+    job: "работя като инженер",
+    favoriteSubject: "история",
+    languages: "руски, английски и малко български",
+    hobbies: "спорт и пътувания"
+  },
+  female: {
+    firstName: "Анна",
+    patronymic: "Сергеевна",
+    surname: "Смирнова",
+    birthDate: "2002-09-05",
+    birthCity: "Минск",
+    birthCountry: "Беларус",
+    residence: "Беларус, град Минск",
+    citizenship: "беларуско",
+    ancestor: "Георги Иванов",
+    preferredCity: "Пловдив",
+    job: "уча в университета",
+    favoriteSubject: "литература",
+    languages: "руски, английски и малко български",
+    hobbies: "книги и музика"
+  }
+};
+
+const LESSON_START_RULES = {
+  1: [
+    "Сначала смотрите на болгарскую строку, потом на транскрипцию. Болгарский текст пишется обычным способом, а в русской транскрипции ударная буква выделена прописной.",
+    "Транскрипция нужна только как опора: она помогает быстро начать говорить, но лучше каждый пример проговаривать вслух и сверять с аудио.",
+    "Если фраза длинная, делите ее на короткие смысловые куски: сначала имя, потом дата, потом город или причина."
+  ],
+  2: [
+    "В болгарском нет русских букв Ы, Ё и Э, поэтому не ищите полного совпадения с русским письмом.",
+    "Буква е обычно читается ближе к русскому э, буква ъ передает короткий средний звук, похожий на ы, а щ читается как шт.",
+    "На собеседовании важнее говорить ясно и спокойно, чем идеально копировать акцент носителя."
+  ],
+  3: [
+    "Для собеседования безопаснее использовать вежливые формы: здравейте, благодаря, моля, довиждане.",
+    "Короткие фразы помогают выиграть время: може ли да повторите, не разбрах, говоря малко български.",
+    "Приветствие и благодарность лучше выучить как готовые блоки, чтобы начать разговор уверенно."
+  ],
+  4: [
+    "Глагол съм нужен там, где по-русски часто связка пропускается: аз съм студент, той е лекар.",
+    "Форма меняется по лицам: аз съм, ти си, той е, ние сме, вие сте, те са.",
+    "Для рассказа о себе чаще всего нужны аз съм, роден съм / родена съм и имам."
+  ],
+  5: [
+    "Отрицание строится просто: частица не ставится перед глаголом или формой съм.",
+    "Частица ли делает вопрос и обычно ставится после важного слова: Вие студент ли сте?",
+    "Если забыли порядок слов, говорите медленнее и короткими предложениями: Не съм студент. Работя като инженер."
+  ],
+  6: [
+    "Происхождение удобно объяснять через предлоги от, в и по линия на: от Русия, в Москва, по линия на прабаба.",
+    "Национальность и гражданство не всегда одно и то же, поэтому отвечайте точно: имам руско гражданство, имам български корени.",
+    "Фразу про корни лучше выучить полностью, потому что ее часто уточняют на собеседовании."
+  ],
+  7: [
+    "Даты в болгарском обычно называют порядковым числительным: първи, втори, трети, дванадесети.",
+    "Год лучше произносить полностью словами: хиляда деветстотин осемдесет и четвърта година, две хиляди и втора година.",
+    "Тренируйте свою дату рождения, дату рождения родственника, номер телефона и адрес отдельно."
+  ],
+  8: [
+    "Многие полезные глаголы в первом лице заканчиваются на -ам или -ям: имам, нямам, работя, живея.",
+    "Для собеседования достаточно уверенно владеть простыми моделями: имам документ, живея в град, работя като.",
+    "Не усложняйте ответ: одна ясная фраза с правильным глаголом лучше длинного предложения, в котором легко ошибиться."
+  ]
+};
+
+const SAMPLE_PERSON_BLOCK = [
+  "Примерные персонажи для тренировки",
+  "Мужской кейс: Петър Алексеевич Иванов. Роден е на дванадесети март хиляда деветстотин осемдесет и четвърта година в Русия, град Москва. Адресът му е: град Москва, улица Тверская, номер петнадесет, апартамент двадесет и четири.",
+  "Женский кейс: Анна Сергеевна Смирнова. Родена е на пети септември две хиляди и втора година в Беларус, град Минск. Адресът ѝ е: град Минск, проспект Независимости, номер четиридесет и пет, апартамент осемнадесет.",
+  "Когда в ответе встречаются квадратные скобки, внутри них теперь дана подсказка с мужским и женским примером. Свою реальную информацию потом нужно заменить самостоятельно."
+];
+
+const HYMN_REFERENCE_BLOCK = [
+  "Официальный гимн Болгарии",
+  "Официальный ответ: Химнът на Република България е песента „Мила Родино“.",
+  "Вопрос: Как се казва официалният химн на Република България? [болг] — «как сэ казва официалният химн на република България?»",
+  "Перевод: Как называется официальный гимн Республики Болгария?",
+  "Ответ: Официалният химн се казва „Мила Родино“. [болг] — «официалният химн сэ казва Мила Родино»",
+  "Перевод: Официальный гимн называется «Мила Родино».",
+  "Полный официальный текст гимна проверяйте на сайте Народного собрания: https://old.parliament.bg/bg/22"
+];
+
+let courseContentAdjusted = false;
+
+function getLessonOriginalModuleNumber(lesson) {
+  const match = String(lesson?.title || "").match(/^Модуль\s+(\d+)\./i);
+  return match ? Number(match[1]) : null;
+}
+
+function prependUniqueLines(lesson, marker, lines) {
+  if (!lesson?.documentLines || lesson.documentLines.includes(marker)) return;
+  lesson.documentLines = [...lines, ...lesson.documentLines];
+}
+
+function renumberVisibleModules(lessons) {
+  let nextNumber = 1;
+  lessons.forEach((lesson) => {
+    const match = String(lesson.title || "").match(/^Модуль\s+(\d+)\.\s*(.+)$/i);
+    if (!match) return;
+
+    const oldNumber = Number(match[1]);
+    const newNumber = nextNumber;
+    nextNumber += 1;
+
+    if (oldNumber === newNumber) return;
+    lesson.title = `Модуль ${newNumber}. ${match[2]}`;
+
+    if (lesson.documentLines?.length) {
+      const sectionPattern = new RegExp(`^${oldNumber}(\\.\\d+\\.)`);
+      lesson.documentLines = lesson.documentLines.map((line) => String(line).replace(sectionPattern, `${newNumber}$1`));
+    }
+  });
+}
+
+function applyCourseContentAdjustments() {
+  if (courseContentAdjusted) return;
+  courseContentAdjusted = true;
+
+  COURSE_DATA.lessons.forEach((lesson) => {
+    const moduleNumber = getLessonOriginalModuleNumber(lesson);
+    if (LESSON_START_RULES[moduleNumber]) {
+      lesson.theory = [...LESSON_START_RULES[moduleNumber], ...(lesson.theory || [])];
+    }
+  });
+
+  const personalLesson = COURSE_DATA.lessons.find((lesson) => /Личные вопросы/i.test(lesson.title));
+  prependUniqueLines(personalLesson, SAMPLE_PERSON_BLOCK[0], SAMPLE_PERSON_BLOCK);
+
+  const countryLesson = COURSE_DATA.lessons.find((lesson) => /Болгария: история/i.test(lesson.title));
+  prependUniqueLines(countryLesson, HYMN_REFERENCE_BLOCK[0], HYMN_REFERENCE_BLOCK);
+
+  renumberVisibleModules(COURSE_DATA.lessons);
+}
+
 function buildTemplateValues() {
   const p = state.profile;
+  const defaults = p.gender === "female" ? SAMPLE_PROFILES.female : SAMPLE_PROFILES.male;
   const relation = p.ancestorRelation || relationFromLineage(p.lineage);
   const relationFemale = ["баба", "майка", "прабаба"].includes(relation);
   const legacyNameParts = String(p.name || "").split(/\s+/).filter(Boolean);
-  const firstName = p.firstName || legacyNameParts[0] || "Егор";
-  const surname = p.surname || legacyNameParts.slice(1).join(" ") || "Романов";
-  const patronymic = p.patronymic || "";
+  const firstName = p.firstName || legacyNameParts[0] || defaults.firstName;
+  const surname = p.surname || legacyNameParts.slice(1).join(" ") || defaults.surname;
+  const patronymic = p.patronymic || defaults.patronymic;
   const fullNameBg = [firstName, patronymic, surname].filter(Boolean).join(" ");
-  const birthDate = formatBirthDateBg(p.birthDate);
-  const birthPlace = buildBirthPlace(p);
-  const birthCity = p.birthCity || p.birthPlace || "Кишинев";
-  const birthCountry = p.birthCountry || "Молдова";
-  const citizenship = normalizeCitizenship(p.citizenship || "молдовско");
+  const birthDate = formatBirthDateBg(p.birthDate || defaults.birthDate);
+  const birthCity = p.birthCity || p.birthPlace || defaults.birthCity;
+  const birthCountry = p.birthCountry || defaults.birthCountry;
+  const birthPlace = p.birthPlace || `${birthCity}, ${birthCountry}`;
+  const citizenship = normalizeCitizenship(p.citizenship || defaults.citizenship);
 
   return {
     firstName,
@@ -633,20 +916,20 @@ function buildTemplateValues() {
     birthPlace,
     birthCity,
     birthCountry,
-    residence: p.residence || birthPlace || "Молдова, Кишинев",
+    residence: p.residence || birthPlace || defaults.residence,
     citizenship,
     lineageBg: lineageText(p.lineage),
     lineageRu: lineageTextRu(p.lineage),
-    ancestor: p.ancestor || "Мария Петрова",
+    ancestor: p.ancestor || defaults.ancestor,
     ancestorRelation: relation,
     ancestorRelationCap: relation.charAt(0).toUpperCase() + relation.slice(1),
     ancestorPronoun: relationFemale ? "Тя" : "Той",
     ancestorNationality: relationFemale ? "българка" : "българин",
-    preferredCity: p.preferredCity || "София",
-    job: normalizeRuWordsToBg(p.job || "уча и се подготвям за интервюто"),
-    favoriteSubject: normalizeRuWordsToBg(p.favoriteSubject || "история"),
-    languages: normalizeRuWordsToBg(p.languages || "руски, английски и малко български"),
-    hobbies: normalizeRuWordsToBg(p.hobbies || "спорт и пътувания")
+    preferredCity: p.preferredCity || defaults.preferredCity,
+    job: normalizeRuWordsToBg(p.job || defaults.job),
+    favoriteSubject: normalizeRuWordsToBg(p.favoriteSubject || defaults.favoriteSubject),
+    languages: normalizeRuWordsToBg(p.languages || defaults.languages),
+    hobbies: normalizeRuWordsToBg(p.hobbies || defaults.hobbies)
   };
 }
 
@@ -713,7 +996,7 @@ function renderLessonNav() {
 
 function renderPhraseCard(phrase) {
   const pronunciationHtml = phrase.pronunciation
-    ? `<div class="pronunciation">${escapeHtml(phrase.pronunciation)}</div>`
+    ? `<div class="pronunciation">${escapeHtml(formatTranscriptText(phrase.pronunciation))}</div>`
     : "";
   const audioHintHtml = phrase.audio
     ? `<span class="audio-hint">${escapeHtml(phrase.audio)}</span>`
@@ -722,10 +1005,10 @@ function renderPhraseCard(phrase) {
     <div class="phrase-card">
       <div class="phrase-card-top">
         <div class="phrase-main">
-          <div class="bg-text">${escapeHtml(phrase.bg)}</div>
-          <div class="accent-text">${escapeHtml(cleanTranscription(phrase.accent))}</div>
+          <div class="bg-text">${escapeHtml(formatBulgarianText(phrase.bg))}</div>
+          <div class="accent-text">${escapeHtml(formatTranscriptText(cleanTranscription(phrase.accent)))}</div>
           ${pronunciationHtml}
-          <div class="translation">${escapeHtml(phrase.ru)}</div>
+          <div class="translation">${escapeHtml(formatTranslationText(phrase.ru))}</div>
         </div>
         ${renderAudioIconButton({ speak: phrase.bg, audio: phrase.audio, label: "Слушать фразу", extraClass: "phrase-audio-button" })}
       </div>
@@ -740,20 +1023,20 @@ function renderQuestionCard(question) {
     ? `
       <div class="template-box">
         <p class="label">Нейтральный шаблон</p>
-        <div class="bg-text">${escapeHtml(question.neutralAnswer)}</div>
-        <div class="accent-text">${escapeHtml(cleanTranscription(question.neutralAccent))}</div>
+        <div class="bg-text">${escapeHtml(formatBulgarianText(question.neutralAnswer))}</div>
+        <div class="accent-text">${escapeHtml(formatTranscriptText(cleanTranscription(question.neutralAccent)))}</div>
       </div>
     `
     : "";
   return `
     <div class="question-card">
       <div class="question-main">
-        <div class="translation">${escapeHtml(question.ru)}</div>
-        <div class="bg-text">${escapeHtml(question.question)}</div>
-        <div class="accent-text">${escapeHtml(cleanTranscription(question.questionAccent))}</div>
-        <div class="bg-text">${escapeHtml(answer.answer)}</div>
-        <div class="accent-text">${escapeHtml(cleanTranscription(answer.accent))}</div>
-        ${answer.answerRu ? `<div class="translation">${escapeHtml(answer.answerRu)}</div>` : ""}
+        <div class="translation">${escapeHtml(formatTranslationText(question.ru))}</div>
+        <div class="bg-text">${escapeHtml(formatBulgarianText(question.question))}</div>
+        <div class="accent-text">${escapeHtml(formatTranscriptText(cleanTranscription(question.questionAccent)))}</div>
+        <div class="bg-text">${escapeHtml(formatBulgarianText(answer.answer))}</div>
+        <div class="accent-text">${escapeHtml(formatTranscriptText(cleanTranscription(answer.accent)))}</div>
+        ${answer.answerRu ? `<div class="translation">${escapeHtml(formatTranslationText(answer.answerRu))}</div>` : ""}
         ${neutralHtml}
       </div>
       <div class="audio-actions">
@@ -769,9 +1052,9 @@ function renderPronunciationRule(rule) {
     .map(
       ([word, accent, pronunciation]) => `
         <div class="rule-example">
-          <strong>${escapeHtml(word)}</strong>
-          <span>${escapeHtml(accent)}</span>
-          <span>${escapeHtml(pronunciation)}</span>
+          <strong>${escapeHtml(formatBulgarianText(word))}</strong>
+          <span>${escapeHtml(formatTranscriptText(cleanTranscription(accent)))}</span>
+          <span>${escapeHtml(formatTranslationText(pronunciation))}</span>
         </div>
       `
     )
@@ -780,8 +1063,8 @@ function renderPronunciationRule(rule) {
   return `
     <div class="rule-card">
       <h5>${escapeHtml(rule.title)}</h5>
-      <p><strong>Зачем:</strong> ${escapeHtml(rule.need)}</p>
-      <p><strong>Правило:</strong> ${escapeHtml(rule.rule)}</p>
+      <p><strong>Зачем:</strong> ${escapeHtml(formatCourseLine(rule.need))}</p>
+      <p><strong>Правило:</strong> ${escapeHtml(formatCourseLine(rule.rule))}</p>
       <div class="rule-examples">${examples}</div>
     </div>
   `;
@@ -803,7 +1086,7 @@ function renderLessonTable(table) {
               .map(
                 (row) => `
                   <tr>
-                    ${row.map((cell, index) => `<td class="${index === 2 ? "accent-cell" : ""}">${escapeHtml(index === 2 ? cleanTranscription(cell) : cell)}</td>`).join("")}
+                    ${row.map((cell, index) => `<td class="${index === 2 ? "accent-cell" : ""}">${escapeHtml(index === 2 ? formatTranscriptText(cleanTranscription(cell)) : formatCourseLine(cell))}</td>`).join("")}
                   </tr>
                 `
               )
@@ -850,12 +1133,12 @@ function renderStructuredPhrase(phrase, moduleNumber = null) {
   return `
     <div class="structured-phrase">
       <div class="structured-phrase-top">
-        <div class="bg-text">${escapeHtml(phrase.bg)}</div>
+        <div class="bg-text">${escapeHtml(formatBulgarianText(phrase.bg))}</div>
         ${renderInlineAudioButton(phrase, "structured-audio-button", moduleNumber)}
       </div>
       <div class="structured-label">Транскрипция:</div>
-      <div class="accent-text">${escapeHtml(phrase.tr)}</div>
-      ${phrase.ru ? `<div class="structured-label">Перевод:</div><div class="translation">${escapeHtml(phrase.ru)}</div>` : ""}
+      <div class="accent-text">${escapeHtml(formatTranscriptText(phrase.tr))}</div>
+      ${phrase.ru ? `<div class="structured-label">Перевод:</div><div class="translation">${escapeHtml(formatTranslationText(phrase.ru))}</div>` : ""}
     </div>
   `;
 }
@@ -879,10 +1162,10 @@ function renderDocumentTable(rows, moduleNumber = null) {
               (row) => `
                 <tr>
                   <td data-label="${labels[0]}">
-                    <span class="doc-table-word">${escapeHtml(row.bg)}</span>
+                    <span class="doc-table-word">${escapeHtml(formatBulgarianText(row.bg))}</span>
                   </td>
-                  <td class="accent-text" data-label="${labels[1]}">${escapeHtml(row.tr)}</td>
-                  <td data-label="${labels[2]}">${escapeHtml(row.ru)}</td>
+                  <td class="accent-text" data-label="${labels[1]}">${escapeHtml(formatTranscriptText(row.tr))}</td>
+                  <td data-label="${labels[2]}">${escapeHtml(formatTranslationText(row.ru))}</td>
                   <td class="doc-table-audio-cell" data-label="${labels[3]}">${renderInlineAudioButton(row, "table-audio-button", moduleNumber)}</td>
                 </tr>
               `
@@ -897,14 +1180,14 @@ function renderDocumentTable(rows, moduleNumber = null) {
 function renderCompactDocumentPhrase(phrase, moduleNumber = null) {
   return `
     <p class="doc-line doc-phrase">
-      <span class="doc-phrase-text">${escapeHtml(phrase.bg)} [болг] — «${escapeHtml(phrase.tr)}»</span>
+      <span class="doc-phrase-text">${escapeHtml(formatBulgarianText(phrase.bg))} [болг] — «${escapeHtml(formatTranscriptText(phrase.tr))}»</span>
       ${renderInlineAudioButton(phrase, "", moduleNumber)}
     </p>
   `;
 }
 
 function renderDocumentLine(line) {
-  const value = String(line || "").trim();
+  const value = formatCourseLine(String(line || "").trim());
   const className = [
     /^(\d+(\.\d+)?\.|[A-ZА]\.\d+\.)/.test(value) ? "doc-subtitle" : "",
     /^(Перевод|Произношение|Пояснение|Правило|Важно|Источник|Цель|Контент|Формат|Кандидат|Служител|Вопрос|Ответ)/i.test(value) ? "doc-note" : "",
@@ -1025,9 +1308,9 @@ function renderMockInterview() {
       <h4>Случайный вопрос</h4>
       <div class="interview-box">
         <div>
-          <div class="translation">${escapeHtml(current.ru)}</div>
-          <div class="interview-question">${escapeHtml(current.question)}</div>
-          <div class="accent-text">${escapeHtml(cleanTranscription(current.questionAccent))}</div>
+          <div class="translation">${escapeHtml(formatTranslationText(current.ru))}</div>
+          <div class="interview-question">${escapeHtml(formatBulgarianText(current.question))}</div>
+          <div class="accent-text">${escapeHtml(formatTranscriptText(cleanTranscription(current.questionAccent)))}</div>
         </div>
         <div class="audio-actions">
           ${renderAudioIconButton({ speak: current.question, audio: current.audio, label: "Слушать вопрос", extraClass: "question-audio-button" })}
@@ -1035,9 +1318,9 @@ function renderMockInterview() {
           <button class="chip-button" type="button" id="nextMockQuestionButton">Следующий вопрос</button>
         </div>
         <div class="answer-reveal" id="mockAnswer">
-          <div class="bg-text">${escapeHtml(answer.answer)}</div>
-          <div class="accent-text">${escapeHtml(cleanTranscription(answer.accent))}</div>
-          ${answer.answerRu ? `<div class="translation">${escapeHtml(answer.answerRu)}</div>` : ""}
+          <div class="bg-text">${escapeHtml(formatBulgarianText(answer.answer))}</div>
+          <div class="accent-text">${escapeHtml(formatTranscriptText(cleanTranscription(answer.accent)))}</div>
+          ${answer.answerRu ? `<div class="translation">${escapeHtml(formatTranslationText(answer.answerRu))}</div>` : ""}
           <div class="audio-actions">
             ${renderAudioIconButton({ speak: answer.answer, label: "Слушать ответ", extraClass: "question-audio-button" })}
           </div>
@@ -1062,7 +1345,7 @@ function renderLessonContent() {
     ? `
       <section class="lesson-section interview-focus">
         <h4>Коротко</h4>
-        ${lesson.theory.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
+        ${lesson.theory.map((item) => `<p>${escapeHtml(formatCourseLine(item))}</p>`).join("")}
       </section>
     `
     : "";
@@ -1122,7 +1405,7 @@ function renderLessonContent() {
           ${lesson.drills.map((drill, index) => `
             <div class="drill-card">
               <div class="drill-row"><strong>Задание ${index + 1}</strong><span>3 повтора</span></div>
-              <div>${escapeHtml(drill)}</div>
+              <div>${escapeHtml(formatCourseLine(drill))}</div>
             </div>
           `).join("")}
         </div>
@@ -1133,7 +1416,7 @@ function renderLessonContent() {
   const mockHtml = lesson.mock ? renderMockInterview() : "";
   const documentHtml = renderDocumentBlocks(lesson);
   const doneLabel = state.progress[lesson.id] ? "Отмечено пройденным" : "Отметить пройденным";
-  const summaryHtml = lesson.summary ? `<p class="lesson-summary">${escapeHtml(lesson.summary)}</p>` : "";
+  const summaryHtml = lesson.summary ? `<p class="lesson-summary">${escapeHtml(formatCourseLine(lesson.summary))}</p>` : "";
 
   els.lessonContent.innerHTML = `
     <div class="lesson-header">
@@ -1522,7 +1805,7 @@ function renderPersonalAnswer() {
   els.personalAnswer.innerHTML = `
     <div>
       <p class="label">Шаблон</p>
-      ${lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+      ${lines.map((line) => `<p>${escapeHtml(formatBulgarianText(line))}</p>`).join("")}
     </div>
     <div>
       <p class="label">Задача</p>
@@ -1732,5 +2015,6 @@ els.copyPersonalButton.addEventListener("click", async () => {
   showToast("Личный рассказ скопирован.");
 });
 
+applyCourseContentAdjustments();
 loadProfileForm();
 initAuth();
