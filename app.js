@@ -636,7 +636,8 @@ function formatBulgarianText(value) {
 }
 
 function formatTranslationText(value) {
-  return expandNumbersInRussian(applyTextReplacements(replaceTemplateHints(value), RU_TEXT_REPLACEMENTS));
+  return expandNumbersInRussian(applyTextReplacements(replaceTemplateHints(value), RU_TEXT_REPLACEMENTS))
+    .replace(/Я из \[Русия \/ Беларус\]\./g, "Я из России / Я из Беларуси.");
 }
 
 function formatTranscriptText(value) {
@@ -1753,6 +1754,123 @@ function renderDocumentTable(rows, moduleNumber = null) {
   `;
 }
 
+const DOCUMENT_SECTION_TITLE_PATTERN = /^(\d+(?:\.\d+)*\.|[A-ZА]\.\d+\.)\s/;
+
+const PLAIN_TABLE_SCHEMAS = [
+  ["Шаг", "Что делать", "Пример"],
+  ["Ошибка", "Почему мешает", "Как исправить"],
+  ["Буква", "Ориентир", "Пример", "Русская подсказка"],
+  ["Буква", "Правило", "Пример", "Чтение"],
+  ["Цифра", "Болгарский", "Произношение"],
+  ["Число", "Болгарский", "Произношение"],
+  ["День", "Болгарский", "Произношение"],
+  ["Болгарский", "Произношение", "Перевод"],
+  ["Дата", "Болгарский", "Произношение"],
+  ["Дата", "Болгарский ответ", "Русская транскрипция и перевод"],
+  ["Что изменяется", "Мужской вариант", "Женский вариант", "Пояснение"],
+  ["Цифра", "По-болгарски", "Произношение"],
+  ["Знак", "По-болгарски", "Произношение"],
+  ["Тема", "Болгарский", "Произношение", "Перевод", "Чтение"],
+  ["Слово", "С ударением", "Произношение", "Перевод"],
+  ["Русский", "Болгарский", "Произношение"],
+  ["Вариант", "Болгарский", "Произношение", "Перевод"],
+  ["Родственница", "Болгарский шаблон", "Произношение и перевод"],
+  ["Болгарский вопрос", "Произношение", "Перевод"],
+  ["Смысл", "Болгарский ответ", "Произношение и перевод"],
+  ["Вопрос", "Ответ «да»", "Ответ «нет»"],
+  ["Ситуация", "Болгарский ответ", "Перевод"],
+  ["Мотив", "Болгарская фраза", "Перевод"],
+  ["Город", "Болгарский ответ", "Перевод"],
+  ["Тема", "Болгарский ответ", "Перевод"],
+  ["Событие", "Дата", "Готовая фраза"],
+  ["Дата", "Болгарский ориентир", "Смысл по-русски"],
+  ["Дата", "Болгарский ответ", "Перевод"],
+  ["Блюдо", "Болгарское описание"],
+  ["Роль", "Болгарский", "Произношение", "Перевод"],
+  ["День", "Тема", "Контроль"],
+  ["День", "Приоритет", "Что можно отложить"]
+];
+
+function isPlainTableStopRow(cells) {
+  return cells.some((cell) => /^(Произношение|Перевод|Подсказка):/i.test(String(cell || "").trim()));
+}
+
+function findPlainTableSchema(chunk) {
+  for (const headers of PLAIN_TABLE_SCHEMAS) {
+    for (let startIndex = 1; startIndex <= Math.min(4, chunk.length - headers.length); startIndex += 1) {
+      if (headers.every((header, index) => String(chunk[startIndex + index] || "").trim() === header)) {
+        return { headers, startIndex };
+      }
+    }
+  }
+  return null;
+}
+
+function formatPlainTableCell(value, header) {
+  const text = String(value || "").trim();
+  if (/^(Цифра|Число|Дата|День)$/i.test(header)) return escapeHtml(replaceTemplateHints(text));
+  if (/(Произношение|Чтение|транскрипция)/i.test(header)) return escapeHtml(formatTranscriptText(cleanTranscription(text)));
+  if (/(Болгар|Фраза|Ответ|Вопрос|Модель|Пример|По-болгарски|С ударением|Ориентир)/i.test(header)) return escapeHtml(formatBulgarianText(text));
+  return escapeHtml(formatTranslationText(text));
+}
+
+function renderPlainDocumentTable(headers, rows) {
+  return `
+    <div class="doc-table-wrap plain-table-wrap">
+      <table class="doc-table plain-doc-table">
+        <thead>
+          <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              (row) => `
+                <tr>
+                  ${row
+                    .map((cell, index) => {
+                      const header = headers[index] || "";
+                      const className = /(Произношение|Чтение|транскрипция)/i.test(header) ? "accent-text" : "";
+                      return `<td class="${className}" data-label="${escapeHtml(header)}">${formatPlainTableCell(cell, header)}</td>`;
+                    })
+                    .join("")}
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderPlainTableChunk(chunk, moduleNumber = null) {
+  const schema = findPlainTableSchema(chunk);
+  if (!schema) return null;
+
+  const { headers, startIndex } = schema;
+  const columnCount = headers.length;
+  const rows = [];
+  let cursor = startIndex + columnCount;
+
+  while (cursor + columnCount <= chunk.length) {
+    const cells = chunk.slice(cursor, cursor + columnCount);
+    if (isPlainTableStopRow(cells)) break;
+    rows.push(cells);
+    cursor += columnCount;
+  }
+
+  if (!rows.length) return null;
+
+  const beforeTable = chunk.slice(0, startIndex).map((line) => renderDocumentLine(line)).join("");
+  const table = renderPlainDocumentTable(headers, rows);
+  const afterTable = chunk.slice(cursor);
+  return `
+    ${beforeTable}
+    ${table}
+    ${afterTable.length ? renderDocumentChunk(afterTable, moduleNumber) : ""}
+  `;
+}
+
 function renderCompactDocumentPhrase(phrase, moduleNumber = null) {
   return `
     <p class="doc-line doc-phrase">
@@ -1786,7 +1904,7 @@ function renderDocumentLine(line) {
   if (!rawValue || isServiceCourseLine(rawValue)) return "";
   const value = /^Перевод:/i.test(rawValue) ? formatTranslationText(rawValue) : formatCourseLine(rawValue);
   const className = [
-    /^(\d+(\.\d+)?\.|[A-ZА]\.\d+\.)/.test(value) ? "doc-subtitle" : "",
+    DOCUMENT_SECTION_TITLE_PATTERN.test(value) ? "doc-subtitle" : "",
     /^(Перевод|Произношение|Пояснение|Правило|Важно|Источник|Цель|Контент|Формат|Кандидат|Служител|Вопрос|Ответ)/i.test(value) ? "doc-note" : "",
     /[а-яА-ЯA-Za-zЪъ][^—]+—\s*«/.test(value) ? "doc-phrase" : "",
     /^[☐□]/.test(value) ? "doc-check" : ""
@@ -1818,6 +1936,8 @@ function renderDocumentLine(line) {
 function renderDocumentChunk(chunk, moduleNumber = null) {
   if (!chunk.length || isServiceCourseLine(chunk[0])) return "";
   if (chunk[0] === HYMN_REFERENCE_BLOCK[0]) return renderHymnTrainingBlock(moduleNumber);
+  const plainTableHtml = renderPlainTableChunk(chunk, moduleNumber);
+  if (plainTableHtml) return plainTableHtml;
 
   const output = [];
   for (let i = 0; i < chunk.length; i += 1) {
@@ -1872,7 +1992,7 @@ function renderDocumentBlocks(lesson) {
   let current = [];
   lesson.documentLines.forEach((line) => {
     if (isServiceCourseLine(line)) return;
-    if (/^(\d+(\.\d+)?\.|[A-ZА]\.\d+\.)/.test(line) && current.length) {
+    if (DOCUMENT_SECTION_TITLE_PATTERN.test(line) && current.length) {
       chunks.push(current);
       current = [];
     }
