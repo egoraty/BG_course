@@ -1,5 +1,5 @@
 const state = {
-  lessonIndex: 0,
+  lessonIndex: Number.parseInt(localStorage.getItem("bgCourseLessonIndex") || "0", 10) || 0,
   courseMode: localStorage.getItem("bgCourseMode") === "interview" ? "interview" : "",
   progressMap: JSON.parse(localStorage.getItem("bgCourseProgressMap") || "{}"),
   progress: {},
@@ -10,6 +10,8 @@ const state = {
 let ACTIVE_COURSE_DATA = COURSE_DATA;
 let activePlayback = null;
 let currentUser = null;
+const LESSON_POSITION_KEY = "bgCourseLessonIndex";
+const LESSON_SCROLL_PREFIX = "bgCourseLessonScroll:";
 
 const SUPABASE_URL = "https://powheluxxtvibrtukzux.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -569,6 +571,7 @@ function trNumberToWords(number) {
 function shouldSkipNumberReplacement(text, offset, length) {
   const prev = text[offset - 1] || "";
   const next = text[offset + length] || "";
+  if (next === "." || prev === ".") return true;
   return /[A-Za-zА-Яа-я_@/]/.test(prev) || /[A-Za-zА-Яа-я_@/]/.test(next);
 }
 
@@ -589,10 +592,8 @@ function expandNumbersInBulgarian(value) {
     .replace(/\b(\d{1,2})-(?:ви|ри|ти)\b/g, (_, number) => BG_ORDINALS[Number(number)] || bgNumberToWords(number))
     .replace(/\b(\d{1,2})-(?:й|я|го)\b/g, (_, number) => BG_ORDINALS[Number(number)] || bgNumberToWords(number))
     .replace(/\b(\d{1,2})\s*-\s*(?:и|ти)\b/g, (_, number) => BG_ORDINALS[Number(number)] || bgNumberToWords(number))
-    .replace(/\b(\d{1,2})\.(?=\s+[А-Яа-я])/g, (_, number) => `${bgNumberToWords(number)}.`)
-    .replace(/\b(\d{1,2})\.(?=\s*$)/g, (_, number) => `${bgNumberToWords(number)}.`)
     .replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (_, first, second) => `${bgNumberToWords(first)} / ${bgNumberToWords(second)}`)
-    .replace(/\b(\d{1,6})\b/g, (match, offset, source) => {
+    .replace(/\b\d{1,6}\b/g, (match, offset, source) => {
       if (shouldSkipNumberReplacement(source, offset, match.length)) return match;
       return bgNumberToWords(Number(match));
     });
@@ -608,10 +609,8 @@ function expandNumbersInRussian(value) {
     .replace(/\b(\d{1,2})-й\b/g, (_, number) => RU_ORDINALS.masculine[Number(number)] || ruNumberToWords(number))
     .replace(/\b(\d{1,2})-я\b/g, (_, number) => RU_ORDINALS.feminine[Number(number)] || ruNumberToWords(number))
     .replace(/\b(\d{1,2})-го\b/g, (_, number) => RU_ORDINALS.genitive[Number(number)] || ruNumberToWords(number))
-    .replace(/\b(\d{1,2})\.(?=\s+[А-Яа-я])/g, (_, number) => `${ruNumberToWords(number)}.`)
-    .replace(/\b(\d{1,2})\.(?=\s*$)/g, (_, number) => `${ruNumberToWords(number)}.`)
     .replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (_, first, second) => `${ruNumberToWords(first)} / ${ruNumberToWords(second)}`)
-    .replace(/\b(\d{1,6})\b/g, (match, offset, source) => {
+    .replace(/\b\d{1,6}\b/g, (match, offset, source) => {
       if (shouldSkipNumberReplacement(source, offset, match.length)) return match;
       return ruNumberToWords(Number(match));
     });
@@ -625,10 +624,8 @@ function expandNumbersInTranscript(value) {
       return `${dayWord} ${monthWord} ${trNumberToWords(year)} годИна`;
     })
     .replace(/\b(\d{1,2})-(?:й|я|го|ви|ри|ти)\b/g, (_, number) => trNumberToWords(number))
-    .replace(/\b(\d{1,2})\.(?=\s+[А-Яа-яA-Za-z])/g, (_, number) => `${trNumberToWords(number)}.`)
-    .replace(/\b(\d{1,2})\.(?=\s*$)/g, (_, number) => `${trNumberToWords(number)}.`)
     .replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (_, first, second) => `${trNumberToWords(first)} / ${trNumberToWords(second)}`)
-    .replace(/\b(\d{1,6})\b/g, (match, offset, source) => {
+    .replace(/\b\d{1,6}\b/g, (match, offset, source) => {
       if (shouldSkipNumberReplacement(source, offset, match.length)) return match;
       return trNumberToWords(Number(match));
     });
@@ -970,6 +967,86 @@ const DOCUMENT_AUDIO_BY_MODULE = new Map();
   DOCUMENT_AUDIO_BY_MODULE.set(`8:${normalizeAudioKey(key)}`, audioPath);
 });
 
+[
+  ["добро утро, госпожо / господине", "dobro-utro-gospozho-gospodine.mp3"],
+  ["добър ден, госпожо / господине", "dobar-den-gospozho-gospodine.mp3"],
+  ["казвам се", "kazvam-se.mp3"],
+  ["записан съм / записана съм за", "zapisan-sam-za-deset-chasa.mp3"],
+  ["заповядайте", "zapovyadaite.mp3"],
+  ["почакайте малко", "pochakaite-malko.mp3"],
+  ["почакайте пет минути", "pochakaite-pet-minuti.mp3"],
+  ["ние ще ви извикаме", "nie-shte-vi-izvikame.mp3"],
+  ["дайте оригиналните документи и преводите, моля", "daite-originalnite-dokumenti-i-prevodite.mp3"],
+  ["ето, моля", "eto-molya.mp3"],
+  ["вземете, моля", "vzemete-molya.mp3"],
+  ["самостоятелно ли учите български език или с преподавател", "samostoyatelno-li-uchite-ili-s-prepodavatel.mp3"],
+  ["с преподавател", "s-prepodavatel.mp3"],
+  ["самостоятелно", "samostoyatelno.mp3"],
+  ["започваме интервюто", "zapochvame-intervyuto.mp3"],
+  ["готови ли сте", "gotovi-li-ste.mp3"],
+  ["ще ви задаваме въпроси на български език", "shte-vi-zadavame-vaprosi-na-balgarski.mp3"],
+  ["желателно е да отговаряте също на български", "zhelatelno-e-da-otgovaryate-na-balgarski.mp3"],
+  ["извинявам се, не ви чух добре", "izvinyavam-se-ne-vi-chuh-dobre.mp3"],
+  ["повторете въпроса, моля", "povtorete-vaprosa-molya.mp3"],
+  ["говорете по-бавно, моля", "govorete-po-bavno-molya.mp3"],
+  ["не разбирам думата", "ne-razbiram-dumata.mp3"],
+  ["може ли да обясните", "mozhe-li-da-obyasnite.mp3"],
+  ["трябва да платите евро", "tryabva-da-platite-evro.mp3"],
+  ["подпишете се тук, моля", "podpishete-se-tuk-molya.mp3"],
+  ["къде да се подпиша", "kade-da-se-podpisha.mp3"],
+  ["тук и на другата страница също", "tuk-i-na-drugata-stranica-sashto.mp3"],
+  ["вие добре говорите български", "vie-dobre-govorite-balgarski.mp3"],
+  ["благодаря. говоря само малко, но се старая и уча езика", "blagodarya-govorya-samo-malko.mp3"],
+  ["запишете трите си имена", "zapishete-trite-si-imena.mp3"],
+  ["довиждане. приятен ден", "dovizhdane-priyaten-den.mp3"],
+  ["подобно. / на вас също", "podobno-na-vas-sashto.mp3"]
+].forEach(([key, file]) => {
+  const audioPath = `audio/course/module-11/${file}`;
+  DOCUMENT_AUDIO_MAP.set(normalizeAudioKey(key), audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`11:${normalizeAudioKey(key)}`, audioPath);
+});
+
+[
+  ["домати", "domati.mp3"],
+  ["краставици", "krastavici.mp3"],
+  ["магданоз", "magdanoz.mp3"],
+  ["олио", "olio.mp3"],
+  ["пипер", "piper.mp3"],
+  ["сирене", "sirene.mp3"],
+  ["зехтин", "zehtin.mp3"],
+  ["лук", "luk.mp3"],
+  ["сол", "sol.mp3"],
+  ["тънки кори", "tanki-kori.mp3"],
+  ["кисело мляко", "kiselo-mlyako.mp3"],
+  ["яйца", "yaytsa.mp3"],
+  ["айрян", "ayryan.mp3"],
+  ["сода", "soda.mp3"],
+  ["копър", "kopar.mp3"],
+  ["орехи", "orehi.mp3"],
+  ["малко чесън", "malko-chesan.mp3"],
+  ["сол на вкус", "sol-na-vkus.mp3"]
+].forEach(([key, file]) => {
+  const audioPath = `audio/course/module-12/${file}`;
+  DOCUMENT_AUDIO_MAP.set(normalizeAudioKey(key), audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`12:${normalizeAudioKey(key)}`, audioPath);
+});
+
+[
+  ["добър ден", "audio/course/module-03/добър ден.mp3"],
+  ["казвам се", "audio/course/module-14/kazvam-se-petar-anna.mp3"],
+  ["аз съм от", "audio/course/module-14/az-sam-ot-rusia-belarus.mp3"],
+  ["уча български език", "audio/course/module-08/уча български език.mp3"],
+  ["да, разбира се", "audio/course/module-14/da-razbira-se.mp3"],
+  ["не, нямам", "audio/course/module-14/ne-nyamam.mp3"],
+  ["повторете въпроса, моля", "audio/course/module-11/povtorete-vaprosa-molya.mp3"],
+  ["говорете по-бавно, моля", "audio/course/module-11/govorete-po-bavno-molya.mp3"],
+  ["благодаря много", "audio/course/module-03/благодаря много.mp3"],
+  ["довиждане. приятен ден", "audio/course/module-14/dovizhdane-priyaten-den.mp3"]
+].forEach(([key, audioPath]) => {
+  DOCUMENT_AUDIO_MAP.set(normalizeAudioKey(key), audioPath);
+  DOCUMENT_AUDIO_BY_MODULE.set(`14:${normalizeAudioKey(key)}`, audioPath);
+});
+
 function normalizeAudioKey(value) {
   return String(value || "")
     .normalize("NFC")
@@ -1038,11 +1115,17 @@ function showAuthScreen(message = "", type = "error") {
 }
 
 function showAuthorizedCourse(session) {
+  const previousUserId = currentUser?.id || "";
+  const appWasOpen = !els.appShell?.classList.contains("is-hidden");
   currentUser = session?.user || currentUser;
   els.authScreen?.classList.add("is-hidden");
   document.body.classList.remove("auth-mode");
   setAuthMessage("");
-  setCourseMode("interview");
+  if (appWasOpen && previousUserId && previousUserId === currentUser?.id) {
+    restoreCurrentLessonPosition();
+    return;
+  }
+  setCourseMode("interview", { restorePosition: true });
 }
 
 function getAuthErrorMessage(error) {
@@ -1126,7 +1209,10 @@ function setCourseMode(_mode = "interview", options = {}) {
   state.courseMode = mode;
   ACTIVE_COURSE_DATA = COURSE_DATA;
   state.progress = state.progressMap[mode] || {};
-  state.lessonIndex = Math.max(0, Math.min(options.lessonIndex || 0, ACTIVE_COURSE_DATA.lessons.length - 1));
+  const savedIndex = Number.parseInt(localStorage.getItem(LESSON_POSITION_KEY) || "0", 10) || 0;
+  const requestedIndex = Number.isInteger(options.lessonIndex) ? options.lessonIndex : savedIndex;
+  state.lessonIndex = Math.max(0, Math.min(requestedIndex, ACTIVE_COURSE_DATA.lessons.length - 1));
+  localStorage.setItem(LESSON_POSITION_KEY, String(state.lessonIndex));
   localStorage.setItem("bgCourseMode", mode);
   els.courseChooser?.classList.add("is-hidden");
   els.appShell?.classList.remove("is-hidden");
@@ -1136,6 +1222,7 @@ function setCourseMode(_mode = "interview", options = {}) {
   if (els.topbarModeLabel) els.topbarModeLabel.textContent = "Подготовка к собеседованию";
   if (els.introPanel) els.introPanel.style.display = "none";
   render();
+  if (options.restorePosition) restoreCurrentLessonPosition();
 }
 
 function showCourseChooser() {
@@ -1146,6 +1233,48 @@ function showCourseChooser() {
   els.courseChooser?.classList.remove("is-hidden");
   els.appShell?.classList.add("is-hidden");
   localStorage.removeItem("bgCourseMode");
+}
+
+function getLessonScrollElement() {
+  const grid = els.lessonContent?.querySelector(".document-section > .document-grid");
+  if (grid && grid.scrollHeight > grid.clientHeight + 4) return grid;
+  return document.scrollingElement || document.documentElement;
+}
+
+function readLessonScrollTop(scroller = getLessonScrollElement()) {
+  if (scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body) {
+    return window.scrollY || scroller.scrollTop || 0;
+  }
+  return scroller?.scrollTop || 0;
+}
+
+function writeLessonScrollTop(top, scroller = getLessonScrollElement()) {
+  const nextTop = Math.max(0, Number(top) || 0);
+  if (scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body) {
+    window.scrollTo({ top: nextTop, behavior: "auto" });
+    return;
+  }
+  if (scroller) scroller.scrollTop = nextTop;
+}
+
+function saveCurrentLessonPosition() {
+  if (!ACTIVE_COURSE_DATA?.lessons?.length) return;
+  localStorage.setItem(LESSON_POSITION_KEY, String(state.lessonIndex));
+  localStorage.setItem(`${LESSON_SCROLL_PREFIX}${state.lessonIndex}`, String(Math.round(readLessonScrollTop())));
+}
+
+function restoreCurrentLessonPosition() {
+  const savedTop = Number(localStorage.getItem(`${LESSON_SCROLL_PREFIX}${state.lessonIndex}`) || "0");
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => writeLessonScrollTop(savedTop));
+  });
+}
+
+function resetCurrentLessonPosition() {
+  requestAnimationFrame(() => {
+    writeLessonScrollTop(0);
+    saveCurrentLessonPosition();
+  });
 }
 
 const SAMPLE_PROFILES = {
@@ -1239,9 +1368,45 @@ const HYMN_REFERENCE_BLOCK = [
   "Вопрос: Как се казва официалният химн на Република България? [болг] — «как сэ казва официалният химн на република България?»",
   "Перевод: Как называется официальный гимн Республики Болгария?",
   "Ответ: Официалният химн се казва „Мила Родино“. [болг] — «официалният химн сэ казва Мила Родино»",
-  "Перевод: Официальный гимн называется «Мила Родино».",
-  "Полный официальный текст гимна проверяйте на сайте Народного собрания: https://old.parliament.bg/bg/22"
+  "Перевод: Официальный гимн называется «Мила Родино»."
 ];
+
+const HYMN_TRAINING_ROWS = [
+  ["Горда Стара планина,", "Гордая Старая планина (Балканские горы),"],
+  ["до ней Дунава синей,", "Рядом с ней синеет Дунай,"],
+  ["слънце Тракия огрява,", "Солнце освещает Фракию,"],
+  ["над Пирина пламеней.", "Над Пирином пламенеет."],
+  ["Припев:", "Припев:"],
+  ["Мила Родино,", "Дорогая Родина,"],
+  ["ти си земен рай,", "Ты - земной рай,"],
+  ["твойта хубост, твойта прелест,", "Твоя красота, твоя прелесть,"],
+  ["ах, те нямат край!", "Ах, не имеют конца!"]
+];
+
+const SERVICE_LINE_PATTERNS = [
+  /Полный официальный текст гимна/i,
+  /проверяйте на сайте/i,
+  /Актуализация/i,
+  /В старых материалах/i,
+  /Что было исправлено/i,
+  /Удалены даты/i,
+  /Личные ответы заменены/i,
+  /Слова и фразы перестроены/i,
+  /Добавлены транскрипции/i,
+  /Исправлены устаревшие/i,
+  /Добавлены недостающие/i,
+  /Источники актуализации/i,
+  /Проверено на/i,
+  /Политические сведения/i,
+  /политические должности/i,
+  /Европейская комиссия/i,
+  /официальные материалы президентской/i
+];
+
+function isServiceCourseLine(line) {
+  const value = String(line || "").trim();
+  return SERVICE_LINE_PATTERNS.some((pattern) => pattern.test(value));
+}
 
 let courseContentAdjusted = false;
 
@@ -1367,11 +1532,14 @@ function answerFor(question) {
   };
 }
 
-function setLesson(index) {
+function setLesson(index, options = {}) {
+  saveCurrentLessonPosition();
   clearActivePlayback();
   state.lessonIndex = Math.max(0, Math.min(ACTIVE_COURSE_DATA.lessons.length - 1, index));
+  localStorage.setItem(LESSON_POSITION_KEY, String(state.lessonIndex));
   render();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (options.restorePosition) restoreCurrentLessonPosition();
+  else resetCurrentLessonPosition();
 }
 
 function updateProgress() {
@@ -1594,8 +1762,28 @@ function renderCompactDocumentPhrase(phrase, moduleNumber = null) {
   `;
 }
 
+function renderHymnTrainingBlock(moduleNumber = null) {
+  const baseLines = HYMN_REFERENCE_BLOCK.map((line) => renderDocumentLine(line)).join("");
+  return `
+    ${baseLines}
+    <div class="hymn-training-block">
+      <h5>Текст гимна для подготовки</h5>
+      <div class="hymn-table">
+        <div class="hymn-table-head">Болгарский</div>
+        <div class="hymn-table-head">Перевод</div>
+        ${HYMN_TRAINING_ROWS.map(([bg, ru]) => `
+          <div class="hymn-line hymn-line-bg">${escapeHtml(bg)}</div>
+          <div class="hymn-line">${escapeHtml(ru)}</div>
+        `).join("")}
+      </div>
+      ${renderInlineAudioButton({ bg: "Мила Родино", tr: "", ru: "" }, "hymn-audio-button", moduleNumber)}
+    </div>
+  `;
+}
+
 function renderDocumentLine(line) {
   const rawValue = String(line || "").trim();
+  if (!rawValue || isServiceCourseLine(rawValue)) return "";
   const value = /^Перевод:/i.test(rawValue) ? formatTranslationText(rawValue) : formatCourseLine(rawValue);
   const className = [
     /^(\d+(\.\d+)?\.|[A-ZА]\.\d+\.)/.test(value) ? "doc-subtitle" : "",
@@ -1628,8 +1816,12 @@ function renderDocumentLine(line) {
 }
 
 function renderDocumentChunk(chunk, moduleNumber = null) {
+  if (!chunk.length || isServiceCourseLine(chunk[0])) return "";
+  if (chunk[0] === HYMN_REFERENCE_BLOCK[0]) return renderHymnTrainingBlock(moduleNumber);
+
   const output = [];
   for (let i = 0; i < chunk.length; i += 1) {
+    if (isServiceCourseLine(chunk[i])) continue;
     const phrase = parseDocumentPhrase(chunk[i], chunk[i + 1]);
 
     if (phrase && isLongDocumentPhrase(phrase)) {
@@ -1679,6 +1871,7 @@ function renderDocumentBlocks(lesson) {
   const chunks = [];
   let current = [];
   lesson.documentLines.forEach((line) => {
+    if (isServiceCourseLine(line)) return;
     if (/^(\d+(\.\d+)?\.|[A-ZА]\.\d+\.)/.test(line) && current.length) {
       chunks.push(current);
       current = [];
@@ -1693,11 +1886,16 @@ function renderDocumentBlocks(lesson) {
       <div class="document-grid">
         ${chunks
           .map(
-            (chunk) => `
-              <div class="document-card">
-                ${renderDocumentChunk(chunk, moduleNumber)}
-              </div>
-            `
+            (chunk) => {
+              const chunkHtml = renderDocumentChunk(chunk, moduleNumber);
+              return chunkHtml
+                ? `
+                  <div class="document-card">
+                    ${chunkHtml}
+                  </div>
+                `
+                : "";
+            }
           )
           .join("")}
       </div>
@@ -1741,6 +1939,7 @@ function renderMockInterview() {
 
 function renderLessonContent() {
   const lesson = ACTIVE_COURSE_DATA.lessons[state.lessonIndex];
+  els.lessonContent.classList.toggle("expanded-lesson", /^Расширенный модуль/i.test(lesson.title));
   const lessonQuestions = lesson.allQuestions
     ? ACTIVE_COURSE_DATA.questions
     : (lesson.questions || []).map(getQuestion).filter(Boolean);
@@ -2378,6 +2577,16 @@ els.signOutButton?.addEventListener("click", handleSignOut);
 els.startCourseButton.addEventListener("click", () => setLesson(1));
 els.skipIntroButton.addEventListener("click", () => setLesson(1));
 els.playIntroButton.addEventListener("click", () => playAudioOrSpeak(ACTIVE_COURSE_DATA.introAudioPath, ACTIVE_COURSE_DATA.introText, 0.82, els.playIntroButton));
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    saveCurrentLessonPosition();
+  } else if (currentUser) {
+    restoreCurrentLessonPosition();
+  }
+});
+window.addEventListener("pagehide", saveCurrentLessonPosition);
+window.addEventListener("beforeunload", saveCurrentLessonPosition);
 
 els.resetProgressButton.addEventListener("click", () => {
   state.progress = {};

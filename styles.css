@@ -673,6 +673,23 @@ button {
   background: #fff;
 }
 
+.lesson-card.expanded-lesson .document-section {
+  border-color: rgba(22, 139, 84, 0.38);
+  background: linear-gradient(180deg, rgba(22, 139, 84, 0.035), rgba(255, 255, 255, 0.92));
+}
+
+.lesson-card.expanded-lesson .document-card {
+  padding: 18px;
+  border-color: rgba(22, 139, 84, 0.18);
+  box-shadow: inset 4px 0 0 rgba(22, 139, 84, 0.28);
+}
+
+.lesson-card.expanded-lesson .doc-subtitle {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(22, 139, 84, 0.055);
+}
+
 .structured-phrase {
   display: grid;
   gap: 7px;
@@ -753,6 +770,62 @@ button {
 .doc-table-audio-cell .inline-audio-button {
   margin-right: auto;
   margin-left: auto;
+}
+
+.hymn-training-block {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(22, 139, 84, 0.28);
+  border-radius: var(--radius);
+  background: rgba(22, 139, 84, 0.035);
+}
+
+.hymn-training-block h5 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.hymn-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.hymn-table-head,
+.hymn-line {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hymn-table-head {
+  background: rgba(22, 139, 84, 0.08);
+  color: var(--deep-green);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.hymn-line {
+  line-height: 1.45;
+}
+
+.hymn-line-bg {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.hymn-table > :nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.hymn-audio-button {
+  justify-self: end;
 }
 
 .doc-line {
@@ -1646,6 +1719,33 @@ button {
 
   .doc-table th {
     font-size: 10px;
+  }
+
+  .hymn-table {
+    grid-template-columns: 1fr;
+  }
+
+  .hymn-table-head:nth-of-type(2) {
+    display: none;
+  }
+
+  .hymn-line {
+    border-bottom: 0;
+  }
+
+  .hymn-line-bg {
+    padding-bottom: 4px;
+    border-top: 1px solid var(--line);
+  }
+
+  .hymn-line-bg:first-of-type {
+    border-top: 0;
+  }
+
+  .hymn-line-bg + .hymn-line {
+    padding-top: 0;
+    padding-bottom: 12px;
+    color: var(--muted);
   }
 
   .responsive-table table {
