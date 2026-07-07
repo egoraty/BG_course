@@ -795,6 +795,7 @@ const DOCUMENT_AUDIO_BY_MODULE = new Map();
   ["рускиня", "рускиня.mp3"],
   ["руснаци", "руснаци.mp3"],
   ["рускини", "рускини.mp3"],
+  ["сърбин", "сърбин.mp3"],
   ["сръбкиня", "сръбкиня.mp3"],
   ["сърби", "сърби.mp3"],
   ["сръбкини", "сръбкини.mp3"]
@@ -985,6 +986,7 @@ const DOCUMENT_AUDIO_BY_MODULE = new Map();
   ["самостоятелно", "samostoyatelno.mp3"],
   ["започваме интервюто", "zapochvame-intervyuto.mp3"],
   ["готови ли сте", "gotovi-li-ste.mp3"],
+  ["да, готов съм / готова съм", "da-gotov-sam-gotova-sam.mp3"],
   ["ще ви задаваме въпроси на български език", "shte-vi-zadavame-vaprosi-na-balgarski.mp3"],
   ["желателно е да отговаряте също на български", "zhelatelno-e-da-otgovaryate-na-balgarski.mp3"],
   ["извинявам се, не ви чух добре", "izvinyavam-se-ne-vi-chuh-dobre.mp3"],
