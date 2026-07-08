@@ -1,17 +1,36 @@
+function parseStoredJson(key, fallback = {}) {
+  return parseJsonValue(localStorage.getItem(key), fallback);
+}
+
+function parseJsonValue(value, fallback = {}) {
+  try {
+    if (!value) return fallback;
+    return typeof value === "string" ? JSON.parse(value) : value;
+  } catch {
+    return fallback;
+  }
+}
+
 const state = {
   lessonIndex: Number.parseInt(localStorage.getItem("bgCourseLessonIndex") || "0", 10) || 0,
   courseMode: localStorage.getItem("bgCourseMode") === "interview" ? "interview" : "",
-  progressMap: JSON.parse(localStorage.getItem("bgCourseProgressMap") || "{}"),
+  progressMap: parseStoredJson("bgCourseProgressMap", {}),
   progress: {},
-  profile: JSON.parse(localStorage.getItem("bgCourseProfile") || "{}"),
+  lessonScrollMap: parseStoredJson("bgCourseLessonScrollMap", {}),
+  profile: parseStoredJson("bgCourseProfile", {}),
   currentMockQuestionId: null
 };
 
 let ACTIVE_COURSE_DATA = COURSE_DATA;
 let activePlayback = null;
 let currentUser = null;
+let cloudSaveTimer = null;
+let accountStateLoadedForUser = "";
+let accountStateStore = "table";
 const LESSON_POSITION_KEY = "bgCourseLessonIndex";
 const LESSON_SCROLL_PREFIX = "bgCourseLessonScroll:";
+const ACCOUNT_STATE_TABLE = "course_progress";
+const ACCOUNT_STATE_METADATA_KEY = "bgCourseState";
 
 const SUPABASE_URL = "https://powheluxxtvibrtukzux.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -84,13 +103,131 @@ const profileFields = {
 };
 
 function saveProgress() {
-  state.progressMap[state.courseMode] = state.progress;
+  const mode = state.courseMode || "interview";
+  state.progressMap[mode] = state.progress;
   localStorage.setItem("bgCourseProgressMap", JSON.stringify(state.progressMap));
   localStorage.setItem("bgCourseProgress", JSON.stringify(state.progress));
+  queueAccountStateSave();
 }
 
 function saveProfile() {
   localStorage.setItem("bgCourseProfile", JSON.stringify(state.profile));
+}
+
+function persistLocalLessonState() {
+  localStorage.setItem(LESSON_POSITION_KEY, String(state.lessonIndex));
+  localStorage.setItem("bgCourseLessonScrollMap", JSON.stringify(state.lessonScrollMap || {}));
+}
+
+function sanitizeLessonIndex(value) {
+  const maxIndex = Math.max(0, (ACTIVE_COURSE_DATA?.lessons?.length || 1) - 1);
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(parsed, maxIndex)) : 0;
+}
+
+function getAccountCourseStatePayload() {
+  const mode = state.courseMode || "interview";
+  return {
+    progressMap: { ...state.progressMap, [mode]: state.progress },
+    lessonIndex: sanitizeLessonIndex(state.lessonIndex),
+    lessonScrollMap: state.lessonScrollMap || {},
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function applyAccountCourseStatePayload(payload = {}) {
+  const progressMap = payload.progressMap && typeof payload.progressMap === "object" ? payload.progressMap : {};
+  const lessonScrollMap = payload.lessonScrollMap && typeof payload.lessonScrollMap === "object" ? payload.lessonScrollMap : {};
+  const mode = state.courseMode || "interview";
+  state.progressMap = progressMap;
+  state.progress = state.progressMap[mode] || {};
+  state.lessonIndex = sanitizeLessonIndex(payload.lessonIndex);
+  state.lessonScrollMap = lessonScrollMap;
+  localStorage.setItem("bgCourseProgressMap", JSON.stringify(state.progressMap));
+  localStorage.setItem("bgCourseProgress", JSON.stringify(state.progress));
+  persistLocalLessonState();
+}
+
+function queueAccountStateSave() {
+  if (!currentUser || !supabaseClient) return;
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = window.setTimeout(() => {
+    saveAccountCourseState();
+  }, 650);
+}
+
+async function flushAccountStateSave() {
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = null;
+  await saveAccountCourseState();
+}
+
+async function saveAccountCourseState() {
+  if (!currentUser || !supabaseClient) return;
+  const payload = getAccountCourseStatePayload();
+
+  try {
+    if (accountStateStore === "table") {
+      const { error } = await supabaseClient.from(ACCOUNT_STATE_TABLE).upsert(
+        {
+          user_id: currentUser.id,
+          progress_map: payload.progressMap,
+          lesson_index: payload.lessonIndex,
+          lesson_scroll_map: payload.lessonScrollMap,
+          updated_at: payload.updatedAt
+        },
+        { onConflict: "user_id" }
+      );
+      if (!error) return;
+      console.warn("Supabase course_progress is unavailable, falling back to user metadata.", error);
+      accountStateStore = "metadata";
+    }
+
+    const { data, error } = await supabaseClient.auth.updateUser({
+      data: { [ACCOUNT_STATE_METADATA_KEY]: payload }
+    });
+    if (error) {
+      console.warn("Could not save account course state.", error);
+      return;
+    }
+    if (data?.user) currentUser = data.user;
+  } catch (error) {
+    console.warn("Could not save account course state.", error);
+  }
+}
+
+async function loadAccountCourseState() {
+  if (!currentUser || !supabaseClient || accountStateLoadedForUser === currentUser.id) return;
+  accountStateLoadedForUser = currentUser.id;
+  accountStateStore = "table";
+
+  const { data, error } = await supabaseClient
+    .from(ACCOUNT_STATE_TABLE)
+    .select("progress_map, lesson_index, lesson_scroll_map")
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (!error) {
+    if (data) {
+      applyAccountCourseStatePayload({
+        progressMap: data.progress_map,
+        lessonIndex: data.lesson_index,
+        lessonScrollMap: data.lesson_scroll_map
+      });
+      return;
+    }
+    queueAccountStateSave();
+    return;
+  }
+
+  console.warn("Supabase course_progress table is unavailable, using auth metadata.", error);
+  accountStateStore = "metadata";
+  const metadataState = parseJsonValue(currentUser.user_metadata?.[ACCOUNT_STATE_METADATA_KEY], null);
+  if (metadataState) {
+    applyAccountCourseStatePayload(metadataState);
+  } else {
+    queueAccountStateSave();
+  }
 }
 
 function showToast(message) {
@@ -1117,14 +1254,16 @@ function showAuthScreen(message = "", type = "error") {
   setAuthMessage(message, type);
 }
 
-function showAuthorizedCourse(session) {
+async function showAuthorizedCourse(session) {
   const previousUserId = currentUser?.id || "";
   const appWasOpen = !els.appShell?.classList.contains("is-hidden");
   currentUser = session?.user || currentUser;
   els.authScreen?.classList.add("is-hidden");
   document.body.classList.remove("auth-mode");
   setAuthMessage("");
+  await loadAccountCourseState();
   if (appWasOpen && previousUserId && previousUserId === currentUser?.id) {
+    render();
     restoreCurrentLessonPosition();
     return;
   }
@@ -1154,14 +1293,14 @@ async function initAuth() {
   }
 
   if (data?.session) {
-    showAuthorizedCourse(data.session);
+    await showAuthorizedCourse(data.session);
   } else {
     showAuthScreen();
   }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session?.user) {
-      showAuthorizedCourse(session);
+      void showAuthorizedCourse(session);
       return;
     }
     currentUser = null;
@@ -1193,11 +1332,13 @@ async function handleAuthSubmit(event) {
     return;
   }
 
-  if (data?.session) showAuthorizedCourse(data.session);
+  if (data?.session) await showAuthorizedCourse(data.session);
 }
 
 async function handleSignOut() {
   clearActivePlayback();
+  saveCurrentLessonPosition();
+  await flushAccountStateSave();
   currentUser = null;
   if (supabaseClient) await supabaseClient.auth.signOut();
   showAuthScreen("Вы вышли из аккаунта.", "info");
@@ -1215,7 +1356,7 @@ function setCourseMode(_mode = "interview", options = {}) {
   const savedIndex = Number.parseInt(localStorage.getItem(LESSON_POSITION_KEY) || "0", 10) || 0;
   const requestedIndex = Number.isInteger(options.lessonIndex) ? options.lessonIndex : savedIndex;
   state.lessonIndex = Math.max(0, Math.min(requestedIndex, ACTIVE_COURSE_DATA.lessons.length - 1));
-  localStorage.setItem(LESSON_POSITION_KEY, String(state.lessonIndex));
+  persistLocalLessonState();
   localStorage.setItem("bgCourseMode", mode);
   els.courseChooser?.classList.add("is-hidden");
   els.appShell?.classList.remove("is-hidden");
@@ -1262,12 +1403,15 @@ function writeLessonScrollTop(top, scroller = getLessonScrollElement()) {
 
 function saveCurrentLessonPosition() {
   if (!ACTIVE_COURSE_DATA?.lessons?.length) return;
-  localStorage.setItem(LESSON_POSITION_KEY, String(state.lessonIndex));
-  localStorage.setItem(`${LESSON_SCROLL_PREFIX}${state.lessonIndex}`, String(Math.round(readLessonScrollTop())));
+  const scrollTop = Math.round(readLessonScrollTop());
+  state.lessonScrollMap[state.lessonIndex] = scrollTop;
+  persistLocalLessonState();
+  localStorage.setItem(`${LESSON_SCROLL_PREFIX}${state.lessonIndex}`, String(scrollTop));
+  queueAccountStateSave();
 }
 
 function restoreCurrentLessonPosition() {
-  const savedTop = Number(localStorage.getItem(`${LESSON_SCROLL_PREFIX}${state.lessonIndex}`) || "0");
+  const savedTop = Number(state.lessonScrollMap?.[state.lessonIndex] ?? localStorage.getItem(`${LESSON_SCROLL_PREFIX}${state.lessonIndex}`) ?? "0");
   requestAnimationFrame(() => {
     requestAnimationFrame(() => writeLessonScrollTop(savedTop));
   });
@@ -1539,7 +1683,8 @@ function setLesson(index, options = {}) {
   saveCurrentLessonPosition();
   clearActivePlayback();
   state.lessonIndex = Math.max(0, Math.min(ACTIVE_COURSE_DATA.lessons.length - 1, index));
-  localStorage.setItem(LESSON_POSITION_KEY, String(state.lessonIndex));
+  persistLocalLessonState();
+  queueAccountStateSave();
   render();
   if (options.restorePosition) restoreCurrentLessonPosition();
   else resetCurrentLessonPosition();
@@ -1737,18 +1882,19 @@ function renderDocumentTable(rows, moduleNumber = null) {
         </thead>
         <tbody>
           ${rows
-            .map(
-              (row) => `
-                <tr>
+            .map((row) => {
+              const audioButton = renderInlineAudioButton(row, "table-audio-button", moduleNumber);
+              return `
+                <tr class="${audioButton ? "has-row-audio" : "no-row-audio"}">
                   <td data-label="${labels[0]}">
                     <span class="doc-table-word">${escapeHtml(formatBulgarianText(row.bg))}</span>
                   </td>
                   <td class="accent-text" data-label="${labels[1]}">${escapeHtml(formatTranscriptText(row.tr))}</td>
                   <td data-label="${labels[2]}">${escapeHtml(formatTranslationText(row.ru))}</td>
-                  <td class="doc-table-audio-cell" data-label="${labels[3]}">${renderInlineAudioButton(row, "table-audio-button", moduleNumber)}</td>
+                  <td class="doc-table-audio-cell" data-label="${labels[3]}">${audioButton}</td>
                 </tr>
-              `
-            )
+              `;
+            })
             .join("")}
         </tbody>
       </table>
