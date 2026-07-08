@@ -1440,7 +1440,7 @@ button {
     top: 0;
     z-index: 20;
     height: auto;
-    max-height: 48vh;
+    max-height: 34vh;
     overflow: auto;
     border-right: 0;
     border-bottom: 1px solid var(--line);
@@ -1470,8 +1470,8 @@ button {
   }
 
   .progress-card {
-    padding: 12px;
-    margin-bottom: 10px;
+    padding: 10px;
+    margin-bottom: 8px;
     box-shadow: none;
   }
 
@@ -1505,27 +1505,32 @@ button {
     grid-template-columns: none;
     gap: 8px;
     overflow-x: auto;
-    padding: 2px 0 8px;
+    padding: 2px 0 6px;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
   }
 
   .lesson-nav-item {
-    flex: 0 0 min(78vw, 310px);
-    min-height: 46px;
-    padding: 10px 12px;
+    flex: 0 0 min(62vw, 240px);
+    min-height: 40px;
+    padding: 8px 10px;
     scroll-snap-align: start;
   }
 
   .lesson-name {
-    display: -webkit-box;
+    display: block;
     overflow: hidden;
     font-size: 14px;
     line-height: 1.25;
-    text-overflow: initial;
-    white-space: normal;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sidebar > .ghost-button {
+    min-height: 34px;
+    margin-top: 8px;
+    padding: 0 10px;
+    font-size: 12px;
   }
 
   .practice-panel,
@@ -1567,8 +1572,9 @@ button {
   }
 
   .interview-mode .lesson-section.interview-focus {
-    padding: 10px;
-    border-width: 1px;
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
 
   .lesson-section h4 {
@@ -1611,11 +1617,17 @@ button {
 
   .inline-audio-button {
     justify-self: end;
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
     padding: 0;
+  }
+
+  .inline-audio-button::before {
+    border-top-width: 7px;
+    border-bottom-width: 7px;
+    border-left-width: 11px;
   }
 
   .bg-text {
@@ -1634,9 +1646,18 @@ button {
     padding: 0 12px;
   }
 
+  .doc-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
   .doc-table {
     min-width: 0;
     table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: transparent;
     font-size: 14px;
   }
 
@@ -1653,13 +1674,21 @@ button {
     display: none;
   }
 
+  .doc-table tbody {
+    display: grid;
+    gap: 8px;
+  }
+
   .doc-table tr {
-    padding: 9px 10px;
-    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #fff;
   }
 
   .doc-table tr:last-child {
-    border-bottom: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   .doc-table th,
@@ -1673,9 +1702,10 @@ button {
 
   .doc-table td {
     display: grid;
-    grid-template-columns: 82px minmax(0, 1fr);
-    gap: 8px;
-    align-items: start;
+    grid-template-columns: 106px minmax(0, 1fr);
+    gap: 10px;
+    align-items: baseline;
+    min-width: 0;
     font-size: 14px;
     line-height: 1.35;
   }
@@ -1697,10 +1727,12 @@ button {
   .doc-table td::before {
     content: attr(data-label);
     color: var(--muted);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 850;
     line-height: 1.25;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
+    white-space: nowrap;
   }
 
   .doc-table-word {
@@ -1711,29 +1743,29 @@ button {
     grid-column: 2;
     margin-top: 0;
     justify-self: start;
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-    min-height: 36px;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
   }
 
   .doc-table:not(.plain-doc-table) tr {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(0, 1fr) 42px;
     grid-template-areas:
       "bg audio"
       "tr audio"
       "ru audio";
-    gap: 5px 8px;
+    gap: 5px 10px;
     align-items: center;
-    padding: 10px;
+    padding: 10px 12px;
   }
 
   .doc-table:not(.plain-doc-table) td {
     margin-top: 0;
     display: grid;
-    grid-template-columns: 74px minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: 106px minmax(0, 1fr);
+    gap: 10px;
     align-items: baseline;
     font-size: 15px;
     line-height: 1.3;
@@ -1764,10 +1796,10 @@ button {
   }
 
   .doc-table:not(.plain-doc-table) .doc-table-audio-cell .inline-audio-button {
-    width: 38px;
-    height: 38px;
-    min-width: 38px;
-    min-height: 38px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
     margin: 0;
   }
 
@@ -1789,11 +1821,11 @@ button {
   }
 
   .plain-doc-table tr {
-    padding: 10px;
+    padding: 10px 12px;
   }
 
   .plain-doc-table td {
-    grid-template-columns: 88px minmax(0, 1fr);
+    grid-template-columns: 106px minmax(0, 1fr);
     font-size: 14px;
   }
 
@@ -1840,7 +1872,7 @@ button {
 @media (max-width: 420px) {
   .main,
   .sidebar {
-    padding: 10px;
+    padding: 8px;
   }
 
   .brand h1 {
@@ -1848,11 +1880,11 @@ button {
   }
 
   .lesson-nav-item {
-    flex-basis: 82vw;
+    flex-basis: min(68vw, 220px);
   }
 
   .lesson-card {
-    padding: 14px 10px;
+    padding: 12px 8px;
   }
 
   .document-card,
@@ -1874,13 +1906,13 @@ button {
 
   .doc-table:not(.plain-doc-table) tr {
     grid-template-columns: minmax(0, 1fr) 40px;
-    gap: 4px 6px;
-    padding: 9px;
+    gap: 4px 8px;
+    padding: 9px 10px;
   }
 
   .doc-table:not(.plain-doc-table) td {
-    grid-template-columns: 68px minmax(0, 1fr);
-    gap: 6px;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 8px;
     font-size: 14px;
   }
 
@@ -1892,8 +1924,33 @@ button {
   }
 
   .plain-doc-table td {
-    grid-template-columns: 78px minmax(0, 1fr);
+    grid-template-columns: 96px minmax(0, 1fr);
     font-size: 13px;
     line-height: 1.35;
+  }
+}
+
+@media (max-width: 360px) {
+  .doc-table:not(.plain-doc-table) tr {
+    grid-template-columns: minmax(0, 1fr) 38px;
+    gap: 5px 7px;
+  }
+
+  .doc-table:not(.plain-doc-table) td,
+  .plain-doc-table td {
+    display: block;
+  }
+
+  .doc-table:not(.plain-doc-table) td::before,
+  .plain-doc-table td::before {
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .doc-table:not(.plain-doc-table) .doc-table-audio-cell .inline-audio-button {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
   }
 }
